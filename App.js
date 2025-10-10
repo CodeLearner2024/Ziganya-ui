@@ -4,7 +4,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import HomeScreen from './screens/HomeScreen';
 import MenuScreen from './screens/MenuScreen';
 import MembersScreen from './screens/MembersScreen';
-// import SettingsScreen from './screens/SettingsScreen'; // nouveau
+import DashboardScreen from './screens/DashboardScreen'
+import ContributionScreen from './screens/ContributionScreen'
 
 const Stack = createNativeStackNavigator();
 
@@ -22,16 +23,25 @@ export default function App() {
           component={MenuScreen} 
           options={{ title: 'Tableau de bord' }} 
         />
-        {/* <Stack.Screen 
-          name="Settings" 
-          component={SettingsScreen} 
-          options={{ title: 'Paramètres' }} 
-        /> */}
+    
           <Stack.Screen 
           name="Members" 
           component={MembersScreen} 
           options={{ title: 'Members' }} 
         />
+
+        <Stack.Screen 
+          name="Dashboard" 
+          component={DashboardScreen} 
+          options={{ title: 'Dashboard' }} // ✅ Ajout de la nouvelle page
+        />
+
+        <Stack.Screen 
+  name="Contribution" 
+  component={ContributionScreen} 
+  options={{ title: 'Contribution' }} 
+/>
+    
       </Stack.Navigator>
     </NavigationContainer>
   );

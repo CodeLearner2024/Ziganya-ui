@@ -9,9 +9,12 @@ export default function MenuScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>Tableau de bord</Text>
 
-      <TouchableOpacity style={styles.button}>
-        <Text style={styles.buttonText}>Dashboard</Text>
-      </TouchableOpacity>
+      <TouchableOpacity 
+  style={styles.button} 
+  onPress={() => navigation.navigate("Dashboard")}
+>
+  <Text style={styles.buttonText}>Dashboard</Text>
+</TouchableOpacity>
 
       <TouchableOpacity style={styles.button}
        onPress={() => navigation.navigate("Members")}
@@ -20,9 +23,12 @@ export default function MenuScreen() {
         <Text style={styles.buttonText}>Members</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.button}>
-        <Text style={styles.buttonText}>Contribution</Text>
-      </TouchableOpacity>
+      <TouchableOpacity
+  style={styles.button}
+  onPress={() => navigation.navigate("Contribution")}
+>
+  <Text style={styles.buttonText}>Contribution</Text>
+</TouchableOpacity>
 
       <TouchableOpacity style={styles.button}>
         <Text style={styles.buttonText}>Credit</Text>

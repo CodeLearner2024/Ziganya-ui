@@ -13,7 +13,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import axios from "axios";
 
 const API_URL =
-  "https://ziganya.onrender.com/ziganya-managment-system/api/v1/members";
+  "http://ziganya.onrender.com/ziganya-managment-system/api/v1/members";
 
 // Fonction utilitaire pour extraire le message d'erreur du backend
 const getBackendErrorMessage = (error) => {
