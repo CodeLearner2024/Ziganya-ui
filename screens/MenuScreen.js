@@ -1,20 +1,27 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 
 export default function MenuScreen() {
+  const navigation = useNavigation();
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Tableau de bord</Text>
+
       <TouchableOpacity style={styles.button}>
         <Text style={styles.buttonText}>Dashboard</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.button}>
-        <Text style={styles.buttonText}>Members </Text>
+      <TouchableOpacity style={styles.button}
+       onPress={() => navigation.navigate("Members")}
+      >
+        
+        <Text style={styles.buttonText}>Members</Text>
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.button}>
-        <Text style={styles.buttonText}>Contribution </Text>
+        <Text style={styles.buttonText}>Contribution</Text>
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.button}>
@@ -24,13 +31,18 @@ export default function MenuScreen() {
       <TouchableOpacity style={styles.button}>
         <Text style={styles.buttonText}>Remboursement</Text>
       </TouchableOpacity>
+
       <TouchableOpacity style={styles.button}>
         <Text style={styles.buttonText}>Report</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.button}>
-        <Text style={styles.buttonText}>Paramètres</Text>
-      </TouchableOpacity>
+      <TouchableOpacity
+  style={styles.button}
+  // onPress={() => navigation.navigate("Settings")}
+>
+
+  <Text style={styles.buttonText}>Paramètres</Text>
+</TouchableOpacity>
     </View>
   );
 }
