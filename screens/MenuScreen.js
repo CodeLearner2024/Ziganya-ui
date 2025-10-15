@@ -31,7 +31,9 @@ export default function MenuScreen() {
 </TouchableOpacity>
 
       <TouchableOpacity style={styles.button}>
-        <Text style={styles.buttonText}>Credit</Text>
+        <Text style={styles.buttonText} 
+        onPress={() => navigation.navigate("Credit")}
+        >Credit</Text>
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.button}>

@@ -6,6 +6,7 @@ import MenuScreen from './screens/MenuScreen';
 import MembersScreen from './screens/MembersScreen';
 import DashboardScreen from './screens/DashboardScreen'
 import ContributionScreen from './screens/ContributionScreen'
+import CreditScreen from './screens/CreditScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -36,10 +37,16 @@ export default function App() {
           options={{ title: 'Dashboard' }} // ✅ Ajout de la nouvelle page
         />
 
+
         <Stack.Screen 
   name="Contribution" 
   component={ContributionScreen} 
   options={{ title: 'Contribution' }} 
+/>
+<Stack.Screen 
+  name="Credit" 
+  component={CreditScreen} 
+  options={{ title: 'Credit' }} 
 />
     
       </Stack.Navigator>

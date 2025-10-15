@@ -9,17 +9,15 @@ import {
     StyleSheet,
     ScrollView,
     ActivityIndicator,
-    Alert,
 } from "react-native";
-// Assurez-vous d'avoir installé ce package : npm install @react-native-picker/picker
-import { Picker } from "@react-native-picker/picker"; 
+import { Picker } from "@react-native-picker/picker";
 import { MaterialIcons } from "@expo/vector-icons";
 import axios from "axios";
 
 // --- Configuration API et Constantes ---
 const API_BASE_URL = "http://192.168.40.90:8001/ziganya-managment-system/api/v1";
 const MEMBERS_API = `${API_BASE_URL}/members`;
-const CONTRIBUTIONS_API = `${API_BASE_URL}/contributions`;
+const CREDITS_API = `${API_BASE_URL}/credits`;
 // ----------------------------------------
 
 // Fonction utilitaire pour extraire le message d'erreur du backend
@@ -43,19 +41,19 @@ const getTodayDate = () => {
     return `${year}-${month}-${day}`;
 };
 
-export default function ContributionScreen() {
+export default function CreditScreen() {
     const [modalVisible, setModalVisible] = useState(false);
-    const [contributions, setContributions] = useState([]);
+    const [credits, setCredits] = useState([]);
     const [members, setMembers] = useState([]); 
     const [loadingData, setLoadingData] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     
-    // Champs du formulaire de contribution
+    // Champs du formulaire de crédit
     const [amount, setAmount] = useState("");
-    const [description, setDescription] = useState("");
+    const [creditDate, setCreditDate] = useState(getTodayDate());
+    const [interestRate, setInterestRate] = useState(""); // Taux d'intérêt
     const [selectedMemberId, setSelectedMemberId] = useState(""); 
-    const [contributionDate, setContributionDate] = useState(getTodayDate());
-    const [editingContributionId, setEditingContributionId] = useState(null); // ID de la contribution en cours d'édition
+    const [editingCreditId, setEditingCreditId] = useState(null); 
     
     // Pop-up messages succès/erreur
     const [popupVisible, setPopupVisible] = useState(false);
@@ -64,7 +62,7 @@ export default function ContributionScreen() {
 
     // Pop-up confirmation suppression
     const [confirmDeleteVisible, setConfirmDeleteVisible] = useState(false);
-    const [contributionToDelete, setContributionToDelete] = useState(null);
+    const [creditToDelete, setCreditToDelete] = useState(null);
 
     const showPopup = (message, type = "success") => {
         setPopupMessage(message);
@@ -76,19 +74,19 @@ export default function ContributionScreen() {
     // Réinitialiser les champs du formulaire
     const resetForm = () => {
         setAmount("");
-        setDescription("");
-        setContributionDate(getTodayDate()); 
-        setEditingContributionId(null);
+        setCreditDate(getTodayDate());
+        setInterestRate("");
+        setEditingCreditId(null);
         if (members.length > 0) {
             setSelectedMemberId(members[0].id); 
         }
     };
 
-    // Charger les données (Membres pour le Picker et Contributions pour la Liste)
+    // Charger les données (Membres pour le Picker et Crédits pour la Liste)
     const loadData = useCallback(async () => {
         setLoadingData(true);
         try {
-            // 1. Charger les membres (NÉCESSAIRE pour le Picker et pour l'initialisation)
+            // 1. Charger les membres (NÉCESSAIRE pour le Picker)
             const membersResponse = await axios.get(MEMBERS_API);
             const membersData = membersResponse.data.map(m => ({
                 id: m.id.toString(),
@@ -96,9 +94,13 @@ export default function ContributionScreen() {
             }));
             setMembers(membersData);
             
-            // 2. Charger la liste des contributions
-            const contributionsResponse = await axios.get(CONTRIBUTIONS_API);
-            setContributions(contributionsResponse.data);
+            if (membersData.length > 0 && !selectedMemberId) {
+                setSelectedMemberId(membersData[0].id);
+            }
+
+            // 2. Charger la liste des crédits
+            const creditsResponse = await axios.get(CREDITS_API);
+            setCredits(creditsResponse.data);
 
         } catch (error) {
             console.error("Erreur lors du chargement des données:", error);
@@ -106,7 +108,7 @@ export default function ContributionScreen() {
         } finally {
             setLoadingData(false);
         }
-    }, []);
+    }, [selectedMemberId]); // Dépendance ajoutée pour initialiser le selectedMemberId
 
     useEffect(() => {
         loadData();
@@ -114,32 +116,35 @@ export default function ContributionScreen() {
 
 
     // Fonction d'ajout/modification (CRUD - C & U)
-    const saveContribution = async () => {
-        if (!selectedMemberId || !amount || !description.trim()) {
-            return showPopup("Veuillez remplir le membre, le montant et la description.", "error");
+    const saveCredit = async () => {
+        if (!selectedMemberId || !amount || !interestRate) {
+            return showPopup("Veuillez remplir le membre, le montant et le taux d'intérêt.", "error");
         }
         if (isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
             return showPopup("Le montant doit être un nombre positif.", "error");
         }
+        if (isNaN(parseFloat(interestRate)) || parseFloat(interestRate) < 0) {
+            return showPopup("Le taux d'intérêt doit être un nombre positif ou nul.", "error");
+        }
         
         const payload = {
             amount: parseFloat(amount),
-            description: description.trim(),
+            creditDate: creditDate,
+            interestRate: parseFloat(interestRate),
             memberId: parseInt(selectedMemberId), // Envoie l'ID
-            contributionDate: contributionDate,
         };
         
         setIsSubmitting(true);
 
         try {
-            if (editingContributionId) {
+            if (editingCreditId) {
                 // Modification (PUT)
-                await axios.put(`${CONTRIBUTIONS_API}/${editingContributionId}`, payload);
-                showPopup("Contribution modifiée avec succès.", "success");
+                await axios.put(`${CREDITS_API}/${editingCreditId}`, payload);
+                showPopup("Crédit modifié avec succès.", "success");
             } else {
                 // Ajout (POST)
-                await axios.post(CONTRIBUTIONS_API, payload);
-                showPopup(`Contribution de ${payload.amount} FBu enregistrée.`, "success");
+                await axios.post(CREDITS_API, payload);
+                showPopup(`Crédit de ${payload.amount} FBu enregistré.`, "success");
             }
             
             setModalVisible(false);
@@ -153,79 +158,99 @@ export default function ContributionScreen() {
         }
     };
 
-    // Préparer l'édition (Similaire à editMember)
-    const editContribution = (contribution) => {
-        // Remplir les champs avec les données de la contribution
-        setAmount(contribution.amount.toString());
-        setDescription(contribution.description);
-        setContributionDate(contribution.contributionDate);
-        setSelectedMemberId(contribution.member.id.toString());
-        setEditingContributionId(contribution.id);
+    // Préparer l'édition
+    const editCredit = (credit) => {
+        setAmount(credit.amount.toString());
+        setCreditDate(credit.creditDate);
+        setInterestRate(credit.interestRate.toString());
+        // Assurez-vous que le membre existe pour éviter les erreurs
+        if (credit.member && credit.member.id) {
+            setSelectedMemberId(credit.member.id.toString());
+        }
+        setEditingCreditId(credit.id);
         setModalVisible(true);
     };
 
-    // Préparer la confirmation de suppression (Similaire à confirmDeleteMember)
-    const confirmDeleteContribution = (contribution) => {
-        setContributionToDelete(contribution);
+    // Préparer la confirmation de suppression
+    const confirmDeleteCredit = (credit) => {
+        setCreditToDelete(credit);
         setConfirmDeleteVisible(true);
     };
 
     // Exécuter la suppression (CRUD - D)
-    const performDeleteContribution = async () => {
-        if (!contributionToDelete) return;
+    const performDeleteCredit = async () => {
+        if (!creditToDelete) return;
         
-        const contributionId = contributionToDelete.id;
-        const memberName = contributionToDelete.member 
-            ? `${contributionToDelete.member.firstname} ${contributionToDelete.member.lastname}` 
-            : `ID ${contributionId}`;
+        const creditId = creditToDelete.id;
+        const memberName = creditToDelete.member 
+            ? `${creditToDelete.member.firstname} ${creditToDelete.member.lastname}` 
+            : `ID ${creditId}`;
 
         try {
-            await axios.delete(`${CONTRIBUTIONS_API}/${contributionId}`);
+            await axios.delete(`${CREDITS_API}/${creditId}`);
             loadData();
-            showPopup(`La contribution de ${memberName} a été supprimée.`, "success");
+            showPopup(`Le crédit de ${memberName} a été supprimé.`, "success");
         } catch (error) {
             console.error("Erreur de suppression:", error);
             showPopup(getBackendErrorMessage(error), "error");
         } finally {
-            setContributionToDelete(null);
+            setCreditToDelete(null);
             setConfirmDeleteVisible(false);
         }
     };
 
 
-    // Afficher les détails (Similaire à viewMember)
-    const viewContribution = (item) => {
+    // Afficher les détails 
+    const viewCredit = (item) => {
         const memberName = item.member 
             ? `${item.member.firstname} ${item.member.lastname}` 
             : `ID ${item.memberId}`;
+            
+        // Formattage du montant à payer
+        const totalAmount = item.totalAmountToPay ? item.totalAmountToPay.toLocaleString('fr-FR') : 'N/A';
+        
         showPopup(
-            `💰 ${item.amount.toLocaleString('fr-FR')} FBu\n👤 Membre: ${memberName}\n📅 Date: ${item.contributionDate}\n📝 Desc: ${item.description}`,
+            `💰 Montant: ${item.amount.toLocaleString('fr-FR')} FBu
+📅 Date: ${item.creditDate}
+% Taux: ${item.interestRate}%
+💵 Total à payer: ${totalAmount} FBu
+🏷️ Statut: ${item.creditDecision}
+👤 Membre: ${memberName}`,
             "success"
         );
     };
 
 
     // Le composant d'une ligne de la liste
-    const ContributionItem = ({ item }) => {
+    const CreditItem = ({ item }) => {
         const memberName = item.member 
             ? `${item.member.firstname} ${item.member.lastname}` 
             : `ID Inconnu (${item.memberId || 'N/A'})`;
+        
+        const statusColor = item.creditDecision === 'IN_TREATMENT' 
+            ? 'orange' 
+            : item.creditDecision === 'APPROVED' 
+            ? 'green' 
+            : 'red';
 
         return (
             <View style={styles.tableRow}>
                 <Text style={[styles.cellText, { flex: 2 }]}>{memberName}</Text>
-                <Text style={[styles.cellText, { flex: 2 }]}>{item.amount ? item.amount.toLocaleString('fr-FR') : '0'} FBu</Text>
+                <Text style={[styles.cellText, { flex: 1.5 }]}>{item.amount ? item.amount.toLocaleString('fr-FR') : '0'} FBu</Text>
+                <Text style={[styles.cellText, { flex: 1.5, color: statusColor, fontWeight: 'bold' }]}>
+                    {item.creditDecision || 'N/A'}
+                </Text>
                 <View style={[styles.cellActions, { flex: 1.5 }]}>
                     {/* Bouton Détails */}
-                    <TouchableOpacity onPress={() => viewContribution(item)}>
+                    <TouchableOpacity onPress={() => viewCredit(item)}>
                         <MaterialIcons name="info" size={22} color="#004080" />
                     </TouchableOpacity>
                     {/* Bouton Modifier */}
-                    <TouchableOpacity onPress={() => editContribution(item)}>
+                    <TouchableOpacity onPress={() => editCredit(item)}>
                         <MaterialIcons name="edit" size={22} color="#FFA500" /> 
                     </TouchableOpacity>
                     {/* Bouton Supprimer */}
-                    <TouchableOpacity onPress={() => confirmDeleteContribution(item)}>
+                    <TouchableOpacity onPress={() => confirmDeleteCredit(item)}>
                         <MaterialIcons name="delete" size={22} color="#FF0000" />
                     </TouchableOpacity>
                 </View>
@@ -258,7 +283,7 @@ export default function ContributionScreen() {
                 <View style={styles.popupOverlay}>
                     <View style={[styles.popupBox, { borderTopColor: "orange", borderTopWidth: 6 }]}>
                         <Text style={styles.popupText}>
-                            Êtes-vous sûr de vouloir supprimer cette contribution ?
+                            Êtes-vous sûr de vouloir supprimer ce crédit ?
                         </Text>
                         <View style={{ flexDirection: "row", justifyContent: "space-around", width: "100%" }}>
                             <TouchableOpacity
@@ -269,7 +294,7 @@ export default function ContributionScreen() {
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={[styles.saveButton, { backgroundColor: "#FF0000", flex: 1, marginLeft: 5 }]}
-                                onPress={performDeleteContribution}
+                                onPress={performDeleteCredit}
                             >
                                 <Text style={styles.saveButtonText}>Supprimer</Text>
                             </TouchableOpacity>
@@ -279,7 +304,7 @@ export default function ContributionScreen() {
             </Modal>
 
 
-            {/* Bouton ajouter contribution */}
+            {/* Bouton ajouter crédit */}
             <TouchableOpacity 
                 style={styles.addButton} 
                 onPress={() => {
@@ -287,7 +312,7 @@ export default function ContributionScreen() {
                     setModalVisible(true);
                 }}
             >
-                <Text style={styles.addButtonText}>➕ Ajouter une contribution</Text>
+                <Text style={styles.addButtonText}>➕ Demander un crédit</Text>
             </TouchableOpacity>
 
             {/* Modal ajout/modif */}
@@ -295,12 +320,12 @@ export default function ContributionScreen() {
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContainer}>
                         <Text style={styles.modalTitle}>
-                            {editingContributionId ? "Modifier la Contribution" : "Enregistrer une Contribution"}
+                            {editingCreditId ? "Modifier le Crédit" : "Demander un Crédit"}
                         </Text>
                         <ScrollView>
                             
                             {/* Champ Membre (Dropdown) */}
-                            <Text style={styles.label}>Membre</Text>
+                            <Text style={styles.label}>Membre demandeur</Text>
                             <View style={styles.pickerContainer}>
                                 {loadingData && members.length === 0 ? (
                                     <ActivityIndicator size="small" color="#004080" style={{height: 40}} />
@@ -325,47 +350,48 @@ export default function ContributionScreen() {
                             </View>
 
                             {/* Champ Montant */}
-                            <Text style={styles.label}>Montant (FBu)</Text>
+                            <Text style={styles.label}>Montant du crédit (FBu)</Text>
                             <TextInput
                                 style={styles.input}
-                                placeholder="Ex: 48000"
+                                placeholder="Ex: 12000"
                                 keyboardType="numeric"
                                 value={amount}
                                 onChangeText={setAmount}
                                 editable={!isSubmitting}
                             />
 
-                            {/* Champ Description */}
-                            <Text style={styles.label}>Description</Text>
+                            {/* Champ Taux d'intérêt */}
+                            <Text style={styles.label}>Taux d'intérêt (%)</Text>
                             <TextInput
                                 style={styles.input}
-                                placeholder="Contribution Octobre"
-                                value={description}
-                                onChangeText={setDescription}
+                                placeholder="Ex: 12.0"
+                                keyboardType="numeric"
+                                value={interestRate}
+                                onChangeText={setInterestRate}
                                 editable={!isSubmitting}
                             />
 
                             {/* Champ Date */}
-                            <Text style={styles.label}>Date (YYYY-MM-DD)</Text>
+                            <Text style={styles.label}>Date de la demande (YYYY-MM-DD)</Text>
                             <TextInput
                                 style={styles.input}
                                 placeholder="AAAA-MM-JJ"
-                                value={contributionDate}
-                                onChangeText={setContributionDate}
+                                value={creditDate}
+                                onChangeText={setCreditDate}
                                 editable={!isSubmitting}
                             />
 
                             <View style={styles.modalButtons}>
                                 <TouchableOpacity 
                                     style={styles.saveButton} 
-                                    onPress={saveContribution}
+                                    onPress={saveCredit}
                                     disabled={isSubmitting || members.length === 0}
                                 >
                                     {isSubmitting ? (
                                         <ActivityIndicator color="#fff" />
                                     ) : (
                                         <Text style={styles.saveButtonText}>
-                                            {editingContributionId ? "💾 Modifier" : "💾 Enregistrer"}
+                                            {editingCreditId ? "💾 Modifier" : "💾 Enregistrer"}
                                         </Text>
                                     )}
                                 </TouchableOpacity>
@@ -385,33 +411,34 @@ export default function ContributionScreen() {
                 </View>
             </Modal>
 
-            {/* Liste des contributions */}
+            {/* Liste des crédits */}
             {loadingData ? (
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color="#004080" />
-                    <Text style={{ marginTop: 10 }}>Chargement des contributions...</Text>
+                    <Text style={{ marginTop: 10 }}>Chargement des crédits...</Text>
                 </View>
-            ) : contributions.length > 0 ? (
+            ) : credits.length > 0 ? (
                 <View style={styles.tableContainer}>
                     <View style={styles.tableHeader}>
                         <Text style={[styles.headerText, { flex: 2 }]}>Membre</Text>
-                        <Text style={[styles.headerText, { flex: 2 }]}>Montant</Text>
+                        <Text style={[styles.headerText, { flex: 1.5 }]}>Montant</Text>
+                        <Text style={[styles.headerText, { flex: 1.5 }]}>Statut</Text>
                         <Text style={[styles.headerText, { flex: 1.5 }]}>Actions</Text>
                     </View>
                     <FlatList
-                        data={contributions}
+                        data={credits}
                         keyExtractor={(item) => item.id.toString()}
-                        renderItem={ContributionItem}
+                        renderItem={CreditItem}
                     />
                 </View>
             ) : (
-                <Text style={styles.emptyText}>Aucune contribution enregistrée</Text>
+                <Text style={styles.emptyText}>Aucun crédit enregistré</Text>
             )}
         </View>
     );
 }
 
-// Styles (Inchagné)
+// Styles (Réutilisés du ContributionScreen)
 const styles = StyleSheet.create({
     container: { flex: 1, padding: 20, backgroundColor: "#E0F3FF" },
     loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 },
