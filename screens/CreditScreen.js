@@ -11,23 +11,40 @@ import {
     ActivityIndicator,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
-import { MaterialIcons } from "@expo/vector-icons";
+import { MaterialIcons, FontAwesome } from "@expo/vector-icons";
 import axios from "axios";
 
 // --- Configuration API et Constantes ---
 const API_BASE_URL = "http://192.168.40.90:8001/ziganya-managment-system/api/v1";
 const MEMBERS_API = `${API_BASE_URL}/members`;
 const CREDITS_API = `${API_BASE_URL}/credits`;
+const CREDIT_TREATMENT_API = `${API_BASE_URL}/credit-traitment`;
 // ----------------------------------------
+
+// Options pour la décision de traitement
+const DECISION_OPTIONS = [
+    { label: "Approuvé (GRANTED)", value: "GRANTED" },
+    { label: "Refusé (REFUSED)", value: "REFUSED" },
+];
 
 // Fonction utilitaire pour extraire le message d'erreur du backend
 const getBackendErrorMessage = (error) => {
+    // Cas 1 : Réponse du serveur reçue (Erreur HTTP 4xx, 5xx)
     if (error.response && error.response.data) {
         const data = error.response.data;
         return data.message || data.errorMessage || JSON.stringify(data);
-    } else if (error.message) {
-        return error.message;
-    } else {
+    } 
+    // Cas 2 : Le serveur n'a pas répondu (ex: serveur éteint, mauvaise URL)
+    else if (error.request) {
+        // Axios error sans réponse du serveur (Network Error, Timeout)
+        return "❌ Connexion au serveur échouée. Le backend n'est peut-être pas lancé ou l'adresse est incorrecte.";
+    } 
+    // Cas 3 : Autres erreurs (ex: Erreur de configuration de la requête)
+    else if (error.message) {
+        return `Une erreur s'est produite : ${error.message}`;
+    } 
+    // Cas 4 : Erreur inconnue
+    else {
         return "Une erreur inconnue est survenue.";
     }
 };
@@ -48,12 +65,17 @@ export default function CreditScreen() {
     const [loadingData, setLoadingData] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     
-    // Champs du formulaire de crédit
+    // Champs du formulaire de crédit (Ajout/Modification)
     const [amount, setAmount] = useState("");
     const [creditDate, setCreditDate] = useState(getTodayDate());
-    const [interestRate, setInterestRate] = useState(""); // Taux d'intérêt
+    const [interestRate, setInterestRate] = useState(""); 
     const [selectedMemberId, setSelectedMemberId] = useState(""); 
     const [editingCreditId, setEditingCreditId] = useState(null); 
+    
+    // État pour la fonctionnalité de traitement
+    const [treatmentModalVisible, setTreatmentModalVisible] = useState(false);
+    const [creditToTreat, setCreditToTreat] = useState(null);
+    const [selectedDecision, setSelectedDecision] = useState(DECISION_OPTIONS[0].value);
     
     // Pop-up messages succès/erreur
     const [popupVisible, setPopupVisible] = useState(false);
@@ -71,7 +93,7 @@ export default function CreditScreen() {
         setTimeout(() => setPopupVisible(false), 3500);
     };
 
-    // Réinitialiser les champs du formulaire
+    // Réinitialiser les champs du formulaire (Ajout/Modification)
     const resetForm = () => {
         setAmount("");
         setCreditDate(getTodayDate());
@@ -82,11 +104,11 @@ export default function CreditScreen() {
         }
     };
 
-    // Charger les données (Membres pour le Picker et Crédits pour la Liste)
+    // --- CRUD Fonctions ---
     const loadData = useCallback(async () => {
         setLoadingData(true);
         try {
-            // 1. Charger les membres (NÉCESSAIRE pour le Picker)
+            // Tenter de charger les membres
             const membersResponse = await axios.get(MEMBERS_API);
             const membersData = membersResponse.data.map(m => ({
                 id: m.id.toString(),
@@ -98,24 +120,24 @@ export default function CreditScreen() {
                 setSelectedMemberId(membersData[0].id);
             }
 
-            // 2. Charger la liste des crédits
+            // Tenter de charger les crédits
             const creditsResponse = await axios.get(CREDITS_API);
             setCredits(creditsResponse.data);
 
         } catch (error) {
             console.error("Erreur lors du chargement des données:", error);
-            showPopup("Erreur de connexion. Impossible de charger les données.", "error");
+            // Utiliser la fonction pour obtenir le message d'erreur
+            const errorMessage = getBackendErrorMessage(error);
+            showPopup(errorMessage, "error");
         } finally {
             setLoadingData(false);
         }
-    }, [selectedMemberId]); // Dépendance ajoutée pour initialiser le selectedMemberId
+    }, [selectedMemberId]); 
 
     useEffect(() => {
         loadData();
     }, [loadData]);
 
-
-    // Fonction d'ajout/modification (CRUD - C & U)
     const saveCredit = async () => {
         if (!selectedMemberId || !amount || !interestRate) {
             return showPopup("Veuillez remplir le membre, le montant et le taux d'intérêt.", "error");
@@ -131,18 +153,16 @@ export default function CreditScreen() {
             amount: parseFloat(amount),
             creditDate: creditDate,
             interestRate: parseFloat(interestRate),
-            memberId: parseInt(selectedMemberId), // Envoie l'ID
+            memberId: parseInt(selectedMemberId), 
         };
         
         setIsSubmitting(true);
 
         try {
             if (editingCreditId) {
-                // Modification (PUT)
                 await axios.put(`${CREDITS_API}/${editingCreditId}`, payload);
                 showPopup("Crédit modifié avec succès.", "success");
             } else {
-                // Ajout (POST)
                 await axios.post(CREDITS_API, payload);
                 showPopup(`Crédit de ${payload.amount} FBu enregistré.`, "success");
             }
@@ -152,18 +172,21 @@ export default function CreditScreen() {
             loadData(); 
         } catch (error) {
             console.error("Erreur d'enregistrement:", error);
+            // Afficher le message d'erreur du backend ou de connexion
             showPopup(getBackendErrorMessage(error), "error");
         } finally {
             setIsSubmitting(false);
         }
     };
-
-    // Préparer l'édition
+    
+    // La fonction editCredit n'appelle la modale que si l'élément n'est PAS traité
     const editCredit = (credit) => {
+        if (credit.creditDecision === 'GRANTED' || credit.creditDecision === 'REFUSED') {
+            return showPopup("Ce crédit a déjà été traité et ne peut pas être modifié.", "error");
+        }
         setAmount(credit.amount.toString());
         setCreditDate(credit.creditDate);
         setInterestRate(credit.interestRate.toString());
-        // Assurez-vous que le membre existe pour éviter les erreurs
         if (credit.member && credit.member.id) {
             setSelectedMemberId(credit.member.id.toString());
         }
@@ -171,13 +194,15 @@ export default function CreditScreen() {
         setModalVisible(true);
     };
 
-    // Préparer la confirmation de suppression
+    // La fonction confirmDeleteCredit n'appelle la modale de suppression que si l'élément n'est PAS traité
     const confirmDeleteCredit = (credit) => {
+        if (credit.creditDecision === 'GRANTED' || credit.creditDecision === 'REFUSED') {
+            return showPopup("Ce crédit a déjà été traité et ne peut pas être supprimé.", "error");
+        }
         setCreditToDelete(credit);
         setConfirmDeleteVisible(true);
     };
 
-    // Exécuter la suppression (CRUD - D)
     const performDeleteCredit = async () => {
         if (!creditToDelete) return;
         
@@ -192,6 +217,7 @@ export default function CreditScreen() {
             showPopup(`Le crédit de ${memberName} a été supprimé.`, "success");
         } catch (error) {
             console.error("Erreur de suppression:", error);
+            // Afficher le message d'erreur du backend ou de connexion
             showPopup(getBackendErrorMessage(error), "error");
         } finally {
             setCreditToDelete(null);
@@ -199,14 +225,11 @@ export default function CreditScreen() {
         }
     };
 
-
-    // Afficher les détails 
     const viewCredit = (item) => {
         const memberName = item.member 
             ? `${item.member.firstname} ${item.member.lastname}` 
             : `ID ${item.memberId}`;
             
-        // Formattage du montant à payer
         const totalAmount = item.totalAmountToPay ? item.totalAmountToPay.toLocaleString('fr-FR') : 'N/A';
         
         showPopup(
@@ -219,6 +242,44 @@ export default function CreditScreen() {
             "success"
         );
     };
+    
+    // --- Fonctionnalité de Traitement ---
+    const openTreatmentModal = (credit) => {
+        setCreditToTreat(credit);
+        setSelectedDecision(DECISION_OPTIONS[0].value);
+        setTreatmentModalVisible(true);
+    };
+    
+    const processCreditTreatment = async () => {
+        if (!creditToTreat || !selectedDecision) return;
+        
+        const creditId = creditToTreat.id;
+        
+        const payload = {
+            creditId: creditId,
+            decision: selectedDecision,
+        };
+        
+        setIsSubmitting(true);
+        
+        try {
+            await axios.post(CREDIT_TREATMENT_API, payload);
+            
+            const decisionLabel = DECISION_OPTIONS.find(d => d.value === selectedDecision).label;
+            showPopup(`Crédit #${creditId} : Statut mis à jour à ${decisionLabel}.`, "success");
+            
+            setTreatmentModalVisible(false);
+            setCreditToTreat(null);
+            loadData();
+            
+        } catch (error) {
+            console.error("Erreur de traitement du crédit:", error);
+            // Afficher le message d'erreur du backend ou de connexion
+            showPopup(getBackendErrorMessage(error), "error");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
 
     // Le composant d'une ligne de la liste
@@ -229,9 +290,19 @@ export default function CreditScreen() {
         
         const statusColor = item.creditDecision === 'IN_TREATMENT' 
             ? 'orange' 
-            : item.creditDecision === 'APPROVED' 
+            : item.creditDecision === 'GRANTED' 
             ? 'green' 
             : 'red';
+
+        // Logique de désactivation : Désactivé si la décision est GRANTED ou REFUSED
+        const isDisabled = item.creditDecision === 'GRANTED' || item.creditDecision === 'REFUSED';
+
+        // L'icône de Traitement est visible seulement si IN_TREATMENT
+        const showTreatButton = item.creditDecision === 'IN_TREATMENT';
+
+        const disabledColor = '#ccc';
+        const enabledEditColor = '#FFA500';
+        const enabledDeleteColor = '#FF0000';
 
         return (
             <View style={styles.tableRow}>
@@ -240,18 +311,36 @@ export default function CreditScreen() {
                 <Text style={[styles.cellText, { flex: 1.5, color: statusColor, fontWeight: 'bold' }]}>
                     {item.creditDecision || 'N/A'}
                 </Text>
-                <View style={[styles.cellActions, { flex: 1.5 }]}>
-                    {/* Bouton Détails */}
+                <View style={[styles.cellActions, { flex: 2 }]}>
+                    
+                    {/* Bouton Traitement (Actif seulement si IN_TREATMENT) */}
+                    {showTreatButton && (
+                        <TouchableOpacity onPress={() => openTreatmentModal(item)}>
+                            <FontAwesome name="hourglass-start" size={22} color="#008CBA" /> 
+                        </TouchableOpacity>
+                    )}
+                    
+                    {/* Bouton Détails (Toujours actif) */}
                     <TouchableOpacity onPress={() => viewCredit(item)}>
                         <MaterialIcons name="info" size={22} color="#004080" />
                     </TouchableOpacity>
-                    {/* Bouton Modifier */}
-                    <TouchableOpacity onPress={() => editCredit(item)}>
-                        <MaterialIcons name="edit" size={22} color="#FFA500" /> 
+                    
+                    {/* Bouton Modifier (Désactivé si traité) */}
+                    <TouchableOpacity onPress={() => editCredit(item)} disabled={isDisabled}>
+                        <MaterialIcons 
+                            name="edit" 
+                            size={22} 
+                            color={isDisabled ? disabledColor : enabledEditColor} 
+                        /> 
                     </TouchableOpacity>
-                    {/* Bouton Supprimer */}
-                    <TouchableOpacity onPress={() => confirmDeleteCredit(item)}>
-                        <MaterialIcons name="delete" size={22} color="#FF0000" />
+                    
+                    {/* Bouton Supprimer (Désactivé si traité) */}
+                    <TouchableOpacity onPress={() => confirmDeleteCredit(item)} disabled={isDisabled}>
+                        <MaterialIcons 
+                            name="delete" 
+                            size={22} 
+                            color={isDisabled ? disabledColor : enabledDeleteColor} 
+                        />
                     </TouchableOpacity>
                 </View>
             </View>
@@ -302,9 +391,65 @@ export default function CreditScreen() {
                     </View>
                 </View>
             </Modal>
+            
+            {/* MODALE DE TRAITEMENT DU CRÉDIT */}
+            <Modal animationType="slide" transparent visible={treatmentModalVisible}>
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContainer}>
+                        <Text style={styles.modalTitle}>
+                            Traiter le Crédit #{creditToTreat?.id}
+                        </Text>
+                        
+                        <Text style={styles.label}>
+                            Décision pour {creditToTreat?.member?.firstname} {creditToTreat?.member?.lastname}
+                        </Text>
+                        
+                        <View style={styles.pickerContainer}>
+                            <Picker
+                                selectedValue={selectedDecision}
+                                onValueChange={(itemValue) => setSelectedDecision(itemValue)}
+                                style={styles.picker}
+                                enabled={!isSubmitting}
+                            >
+                                {DECISION_OPTIONS.map((option) => (
+                                    <Picker.Item 
+                                        key={option.value} 
+                                        label={option.label} 
+                                        value={option.value}   
+                                    />
+                                ))}
+                            </Picker>
+                        </View>
+                        
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity 
+                                style={[styles.saveButton, {backgroundColor: '#1E90FF'}]} 
+                                onPress={processCreditTreatment}
+                                disabled={isSubmitting}
+                            >
+                                {isSubmitting ? (
+                                    <ActivityIndicator color="#fff" />
+                                ) : (
+                                    <Text style={styles.saveButtonText}>✅ Appliquer la Décision</Text>
+                                )}
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.cancelButton}
+                                onPress={() => {
+                                    setTreatmentModalVisible(false);
+                                    setCreditToTreat(null);
+                                }}
+                                disabled={isSubmitting}
+                            >
+                                <Text style={styles.cancelButtonText}>Annuler</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
 
 
-            {/* Bouton ajouter crédit */}
+            {/* Bouton ajouter crédit (Demande) */}
             <TouchableOpacity 
                 style={styles.addButton} 
                 onPress={() => {
@@ -423,7 +568,7 @@ export default function CreditScreen() {
                         <Text style={[styles.headerText, { flex: 2 }]}>Membre</Text>
                         <Text style={[styles.headerText, { flex: 1.5 }]}>Montant</Text>
                         <Text style={[styles.headerText, { flex: 1.5 }]}>Statut</Text>
-                        <Text style={[styles.headerText, { flex: 1.5 }]}>Actions</Text>
+                        <Text style={[styles.headerText, { flex: 2 }]}>Actions</Text>
                     </View>
                     <FlatList
                         data={credits}
@@ -438,7 +583,7 @@ export default function CreditScreen() {
     );
 }
 
-// Styles (Réutilisés du ContributionScreen)
+// Styles (Inchagné)
 const styles = StyleSheet.create({
     container: { flex: 1, padding: 20, backgroundColor: "#E0F3FF" },
     loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 },
@@ -524,7 +669,7 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     cellText: { fontSize: 14, color: "#000", textAlign: 'center' },
-    cellActions: { flexDirection: "row", justifyContent: "space-around" },
+    cellActions: { flexDirection: "row", justifyContent: "space-around", minWidth: 100 }, 
     emptyText: { textAlign: "center", color: "#555", marginTop: 30, fontStyle: "italic" },
 
     popupOverlay: {
