@@ -15,7 +15,7 @@ import { MaterialIcons, FontAwesome } from "@expo/vector-icons";
 import axios from "axios";
 
 // --- Configuration API et Constantes ---
-const API_BASE_URL = "http://192.168.40.90:8001/ziganya-managment-system/api/v1";
+const API_BASE_URL = "https://ziganya.onrender.com/ziganya-managment-system/api/v1";
 const MEMBERS_API = `${API_BASE_URL}/members`;
 const CREDITS_API = `${API_BASE_URL}/credits`;
 const CREDIT_TREATMENT_API = `${API_BASE_URL}/credit-traitment`;
@@ -23,6 +23,7 @@ const CREDIT_TREATMENT_API = `${API_BASE_URL}/credit-traitment`;
 
 // Options pour la décision de traitement
 const DECISION_OPTIONS = [
+    { label: "En Cours (IN_TREATMENT)", value: "IN_TREATMENT" }, // Ajout d'une option par défaut claire
     { label: "Approuvé (GRANTED)", value: "GRANTED" },
     { label: "Refusé (REFUSED)", value: "REFUSED" },
 ];
@@ -75,7 +76,8 @@ export default function CreditScreen() {
     // État pour la fonctionnalité de traitement
     const [treatmentModalVisible, setTreatmentModalVisible] = useState(false);
     const [creditToTreat, setCreditToTreat] = useState(null);
-    const [selectedDecision, setSelectedDecision] = useState(DECISION_OPTIONS[0].value);
+    // Initialiser la décision à la première option (IN_TREATMENT)
+    const [selectedDecision, setSelectedDecision] = useState(DECISION_OPTIONS[0].value); 
     
     // Pop-up messages succès/erreur
     const [popupVisible, setPopupVisible] = useState(false);
@@ -90,6 +92,7 @@ export default function CreditScreen() {
         setPopupMessage(message);
         setPopupType(type);
         setPopupVisible(true);
+        // Fermeture automatique après 3.5 secondes
         setTimeout(() => setPopupVisible(false), 3500);
     };
 
@@ -99,8 +102,12 @@ export default function CreditScreen() {
         setCreditDate(getTodayDate());
         setInterestRate("");
         setEditingCreditId(null);
-        if (members.length > 0) {
+        // Sélectionner le premier membre s'il existe
+        if (members.length > 0 && !selectedMemberId) {
             setSelectedMemberId(members[0].id); 
+        } else if (members.length > 0 && editingCreditId === null) {
+            // Si on ouvre pour ajouter (pas en modification), on peut forcer la sélection du premier
+            setSelectedMemberId(members[0].id);
         }
     };
 
@@ -126,7 +133,6 @@ export default function CreditScreen() {
 
         } catch (error) {
             console.error("Erreur lors du chargement des données:", error);
-            // Utiliser la fonction pour obtenir le message d'erreur
             const errorMessage = getBackendErrorMessage(error);
             showPopup(errorMessage, "error");
         } finally {
@@ -163,6 +169,8 @@ export default function CreditScreen() {
                 await axios.put(`${CREDITS_API}/${editingCreditId}`, payload);
                 showPopup("Crédit modifié avec succès.", "success");
             } else {
+                // Pour un nouveau crédit, il est logique de le mettre en IN_TREATMENT
+                payload.creditDecision = "IN_TREATMENT"; 
                 await axios.post(CREDITS_API, payload);
                 showPopup(`Crédit de ${payload.amount} FBu enregistré.`, "success");
             }
@@ -172,7 +180,6 @@ export default function CreditScreen() {
             loadData(); 
         } catch (error) {
             console.error("Erreur d'enregistrement:", error);
-            // Afficher le message d'erreur du backend ou de connexion
             showPopup(getBackendErrorMessage(error), "error");
         } finally {
             setIsSubmitting(false);
@@ -217,7 +224,6 @@ export default function CreditScreen() {
             showPopup(`Le crédit de ${memberName} a été supprimé.`, "success");
         } catch (error) {
             console.error("Erreur de suppression:", error);
-            // Afficher le message d'erreur du backend ou de connexion
             showPopup(getBackendErrorMessage(error), "error");
         } finally {
             setCreditToDelete(null);
@@ -245,8 +251,13 @@ export default function CreditScreen() {
     
     // --- Fonctionnalité de Traitement ---
     const openTreatmentModal = (credit) => {
+        // Assurez-vous que le crédit est bien en traitement ou nouveau pour pouvoir le traiter
+        if (credit.creditDecision === 'GRANTED' || credit.creditDecision === 'REFUSED') {
+            return showPopup("Ce crédit a déjà été traité.", "error");
+        }
         setCreditToTreat(credit);
-        setSelectedDecision(DECISION_OPTIONS[0].value);
+        // S'assurer que la décision par défaut est bien IN_TREATMENT si ce n'est pas déjà le cas
+        setSelectedDecision(DECISION_OPTIONS.find(d => d.value === 'GRANTED' || d.value === 'REFUSED') ? 'GRANTED' : DECISION_OPTIONS[0].value);
         setTreatmentModalVisible(true);
     };
     
@@ -263,6 +274,7 @@ export default function CreditScreen() {
         setIsSubmitting(true);
         
         try {
+            // Utilisation de CREDIT_TREATMENT_API pour mettre à jour la décision
             await axios.post(CREDIT_TREATMENT_API, payload);
             
             const decisionLabel = DECISION_OPTIONS.find(d => d.value === selectedDecision).label;
@@ -274,7 +286,6 @@ export default function CreditScreen() {
             
         } catch (error) {
             console.error("Erreur de traitement du crédit:", error);
-            // Afficher le message d'erreur du backend ou de connexion
             showPopup(getBackendErrorMessage(error), "error");
         } finally {
             setIsSubmitting(false);
@@ -292,26 +303,35 @@ export default function CreditScreen() {
             ? 'orange' 
             : item.creditDecision === 'GRANTED' 
             ? 'green' 
-            : 'red';
+            : item.creditDecision === 'REFUSED'
+            ? 'red'
+            : 'gray'; // Ajout d'une couleur par défaut
 
         // Logique de désactivation : Désactivé si la décision est GRANTED ou REFUSED
-        const isDisabled = item.creditDecision === 'GRANTED' || item.creditDecision === 'REFUSED';
+        const isTreated = item.creditDecision === 'GRANTED' || item.creditDecision === 'REFUSED';
 
         // L'icône de Traitement est visible seulement si IN_TREATMENT
         const showTreatButton = item.creditDecision === 'IN_TREATMENT';
-
-        const disabledColor = '#ccc';
-        const enabledEditColor = '#FFA500';
-        const enabledDeleteColor = '#FF0000';
+        
+        const actionJustificationStyle = isTreated 
+            ? { justifyContent: 'flex-end' } 
+            : { justifyContent: 'space-around' };
 
         return (
             <View style={styles.tableRow}>
-                <Text style={[styles.cellText, { flex: 2 }]}>{memberName}</Text>
-                <Text style={[styles.cellText, { flex: 1.5 }]}>{item.amount ? item.amount.toLocaleString('fr-FR') : '0'} FBu</Text>
-                <Text style={[styles.cellText, { flex: 1.5, color: statusColor, fontWeight: 'bold' }]}>
+                {/* Membre (Aligné à gauche) */}
+                <Text style={[styles.cellText, styles.cellMember]}>{memberName}</Text>
+                
+                {/* Montant (Aligné au centre) */}
+                <Text style={[styles.cellText, styles.cellAmount]}>{item.amount ? item.amount.toLocaleString('fr-FR') : '0'} FBu</Text>
+                
+                {/* Statut (Aligné au centre) */}
+                <Text style={[styles.cellText, styles.cellStatus, { color: statusColor, fontWeight: 'bold' }]}>
                     {item.creditDecision || 'N/A'}
                 </Text>
-                <View style={[styles.cellActions, { flex: 2 }]}>
+                
+                {/* Actions (Alignement dynamique) */}
+                <View style={[styles.cellActions, actionJustificationStyle]}>
                     
                     {/* Bouton Traitement (Actif seulement si IN_TREATMENT) */}
                     {showTreatButton && (
@@ -325,23 +345,27 @@ export default function CreditScreen() {
                         <MaterialIcons name="info" size={22} color="#004080" />
                     </TouchableOpacity>
                     
-                    {/* Bouton Modifier (Désactivé si traité) */}
-                    <TouchableOpacity onPress={() => editCredit(item)} disabled={isDisabled}>
-                        <MaterialIcons 
-                            name="edit" 
-                            size={22} 
-                            color={isDisabled ? disabledColor : enabledEditColor} 
-                        /> 
-                    </TouchableOpacity>
+                    {/* Bouton Modifier (Visible seulement si PAS traité) */}
+                    {!isTreated && (
+                        <TouchableOpacity onPress={() => editCredit(item)}>
+                            <MaterialIcons 
+                                name="edit" 
+                                size={22} 
+                                color="#FFA500" 
+                            /> 
+                        </TouchableOpacity>
+                    )}
                     
-                    {/* Bouton Supprimer (Désactivé si traité) */}
-                    <TouchableOpacity onPress={() => confirmDeleteCredit(item)} disabled={isDisabled}>
-                        <MaterialIcons 
-                            name="delete" 
-                            size={22} 
-                            color={isDisabled ? disabledColor : enabledDeleteColor} 
-                        />
-                    </TouchableOpacity>
+                    {/* Bouton Supprimer (Visible seulement si PAS traité) */}
+                    {!isTreated && (
+                        <TouchableOpacity onPress={() => confirmDeleteCredit(item)}>
+                            <MaterialIcons 
+                                name="delete" 
+                                size={22} 
+                                color="#FF0000" 
+                            />
+                        </TouchableOpacity>
+                    )}
                 </View>
             </View>
         );
@@ -350,105 +374,6 @@ export default function CreditScreen() {
     return (
         <View style={styles.container}>
             
-            {/* Pop-up message (Succès/Erreur) */}
-            <Modal visible={popupVisible} transparent animationType="fade">
-                <View style={styles.popupOverlay}>
-                    <View
-                        style={[
-                            styles.popupBox,
-                            popupType === "error" ? styles.popupError : styles.popupSuccess,
-                        ]}
-                    >
-                        <Text style={styles.popupText}>{popupMessage}</Text>
-                        <TouchableOpacity onPress={() => setPopupVisible(false)}>
-                            <Text style={styles.closeText}>Fermer</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
-            
-            {/* Pop-up confirmation suppression */}
-            <Modal visible={confirmDeleteVisible} transparent animationType="fade">
-                <View style={styles.popupOverlay}>
-                    <View style={[styles.popupBox, { borderTopColor: "orange", borderTopWidth: 6 }]}>
-                        <Text style={styles.popupText}>
-                            Êtes-vous sûr de vouloir supprimer ce crédit ?
-                        </Text>
-                        <View style={{ flexDirection: "row", justifyContent: "space-around", width: "100%" }}>
-                            <TouchableOpacity
-                                style={[styles.saveButton, { backgroundColor: "#ccc", flex: 1, marginRight: 5 }]}
-                                onPress={() => setConfirmDeleteVisible(false)}
-                            >
-                                <Text style={styles.saveButtonText}>Annuler</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[styles.saveButton, { backgroundColor: "#FF0000", flex: 1, marginLeft: 5 }]}
-                                onPress={performDeleteCredit}
-                            >
-                                <Text style={styles.saveButtonText}>Supprimer</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
-            </Modal>
-            
-            {/* MODALE DE TRAITEMENT DU CRÉDIT */}
-            <Modal animationType="slide" transparent visible={treatmentModalVisible}>
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContainer}>
-                        <Text style={styles.modalTitle}>
-                            Traiter le Crédit #{creditToTreat?.id}
-                        </Text>
-                        
-                        <Text style={styles.label}>
-                            Décision pour {creditToTreat?.member?.firstname} {creditToTreat?.member?.lastname}
-                        </Text>
-                        
-                        <View style={styles.pickerContainer}>
-                            <Picker
-                                selectedValue={selectedDecision}
-                                onValueChange={(itemValue) => setSelectedDecision(itemValue)}
-                                style={styles.picker}
-                                enabled={!isSubmitting}
-                            >
-                                {DECISION_OPTIONS.map((option) => (
-                                    <Picker.Item 
-                                        key={option.value} 
-                                        label={option.label} 
-                                        value={option.value}   
-                                    />
-                                ))}
-                            </Picker>
-                        </View>
-                        
-                        <View style={styles.modalButtons}>
-                            <TouchableOpacity 
-                                style={[styles.saveButton, {backgroundColor: '#1E90FF'}]} 
-                                onPress={processCreditTreatment}
-                                disabled={isSubmitting}
-                            >
-                                {isSubmitting ? (
-                                    <ActivityIndicator color="#fff" />
-                                ) : (
-                                    <Text style={styles.saveButtonText}>✅ Appliquer la Décision</Text>
-                                )}
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.cancelButton}
-                                onPress={() => {
-                                    setTreatmentModalVisible(false);
-                                    setCreditToTreat(null);
-                                }}
-                                disabled={isSubmitting}
-                            >
-                                <Text style={styles.cancelButtonText}>Annuler</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
-            </Modal>
-
-
             {/* Bouton ajouter crédit (Demande) */}
             <TouchableOpacity 
                 style={styles.addButton} 
@@ -456,12 +381,42 @@ export default function CreditScreen() {
                     resetForm();
                     setModalVisible(true);
                 }}
+                disabled={popupVisible || treatmentModalVisible || confirmDeleteVisible} // Désactiver le bouton si un autre modal est actif
             >
                 <Text style={styles.addButtonText}>➕ Demander un crédit</Text>
             </TouchableOpacity>
 
-            {/* Modal ajout/modif */}
-            <Modal animationType="slide" transparent visible={modalVisible}>
+            {/* Liste des crédits */}
+            {loadingData ? (
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#004080" />
+                    <Text style={{ marginTop: 10 }}>Chargement des crédits...</Text>
+                </View>
+            ) : credits.length > 0 ? (
+                <View style={styles.tableContainer}>
+                    {/* En-tête du tableau */}
+                    <View style={styles.tableHeader}>
+                        <Text style={[styles.headerText, styles.headerMember]}>Membre</Text>
+                        <Text style={[styles.headerText, styles.headerAmount]}>Montant</Text>
+                        <Text style={[styles.headerText, styles.headerStatus]}>Statut</Text>
+                        <Text style={[styles.headerText, styles.headerActions]}>Actions</Text>
+                    </View>
+                    <FlatList
+                        data={credits}
+                        keyExtractor={(item) => item.id.toString()}
+                        renderItem={CreditItem}
+                    />
+                </View>
+            ) : (
+                <Text style={styles.emptyText}>Aucun crédit enregistré</Text>
+            )}
+
+            {/* MODALE D'AJOUT/MODIFICATION DE CRÉDIT */}
+            <Modal 
+                animationType="slide" 
+                transparent 
+                visible={modalVisible && !popupVisible && !treatmentModalVisible && !confirmDeleteVisible} // Rendu AVANT les modales de confirmation/traitement
+            >
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContainer}>
                         <Text style={styles.modalTitle}>
@@ -485,7 +440,7 @@ export default function CreditScreen() {
                                             <Picker.Item 
                                                 key={member.id} 
                                                 label={member.name} 
-                                                value={member.id}   
+                                                value={member.id}  
                                             />
                                         ))}
                                     </Picker>
@@ -556,34 +511,120 @@ export default function CreditScreen() {
                 </View>
             </Modal>
 
-            {/* Liste des crédits */}
-            {loadingData ? (
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color="#004080" />
-                    <Text style={{ marginTop: 10 }}>Chargement des crédits...</Text>
-                </View>
-            ) : credits.length > 0 ? (
-                <View style={styles.tableContainer}>
-                    <View style={styles.tableHeader}>
-                        <Text style={[styles.headerText, { flex: 2 }]}>Membre</Text>
-                        <Text style={[styles.headerText, { flex: 1.5 }]}>Montant</Text>
-                        <Text style={[styles.headerText, { flex: 1.5 }]}>Statut</Text>
-                        <Text style={[styles.headerText, { flex: 2 }]}>Actions</Text>
+            {/* MODALE DE TRAITEMENT DU CRÉDIT */}
+            <Modal 
+                animationType="slide" 
+                transparent 
+                visible={treatmentModalVisible && !popupVisible && !confirmDeleteVisible} // Rendu AVANT le popup de message
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContainer}>
+                        <Text style={styles.modalTitle}>
+                            Traiter le Crédit #{creditToTreat?.id}
+                        </Text>
+                        
+                        <Text style={styles.label}>
+                            Décision pour {creditToTreat?.member?.firstname} {creditToTreat?.member?.lastname}
+                        </Text>
+                        
+                        <View style={styles.pickerContainer}>
+                            <Picker
+                                selectedValue={selectedDecision}
+                                onValueChange={(itemValue) => setSelectedDecision(itemValue)}
+                                style={styles.picker}
+                                enabled={!isSubmitting}
+                            >
+                                {DECISION_OPTIONS.map((option) => (
+                                    <Picker.Item 
+                                        key={option.value} 
+                                        label={option.label} 
+                                        value={option.value}  
+                                    />
+                                ))}
+                            </Picker>
+                        </View>
+                        
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity 
+                                style={[styles.saveButton, {backgroundColor: '#1E90FF'}]} 
+                                onPress={processCreditTreatment}
+                                disabled={isSubmitting}
+                            >
+                                {isSubmitting ? (
+                                    <ActivityIndicator color="#fff" />
+                                ) : (
+                                    <Text style={styles.saveButtonText}>Décision</Text>
+                                )}
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.cancelButton}
+                                onPress={() => {
+                                    setTreatmentModalVisible(false);
+                                    setCreditToTreat(null);
+                                }}
+                                disabled={isSubmitting}
+                            >
+                                <Text style={styles.cancelButtonText}>Annuler</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
-                    <FlatList
-                        data={credits}
-                        keyExtractor={(item) => item.id.toString()}
-                        renderItem={CreditItem}
-                    />
                 </View>
-            ) : (
-                <Text style={styles.emptyText}>Aucun crédit enregistré</Text>
-            )}
+            </Modal>
+
+            {/* Pop-up confirmation suppression */}
+            <Modal 
+                visible={confirmDeleteVisible && !popupVisible} // Rendu AVANT le popup de message
+                transparent 
+                animationType="fade"
+            >
+                <View style={styles.popupOverlay}>
+                    <View style={[styles.popupBox, { borderTopColor: "orange", borderTopWidth: 6 }]}>
+                        <Text style={styles.popupText}>
+                            Êtes-vous sûr de vouloir supprimer ce crédit ?
+                        </Text>
+                        <View style={{ flexDirection: "row", justifyContent: "space-around", width: "100%" }}>
+                            <TouchableOpacity
+                                style={[styles.saveButton, { backgroundColor: "#ccc", flex: 1, marginRight: 5 }]}
+                                onPress={() => setConfirmDeleteVisible(false)}
+                            >
+                                <Text style={styles.saveButtonText}>Annuler</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.saveButton, { backgroundColor: "#FF0000", flex: 1, marginLeft: 5 }]}
+                                onPress={performDeleteCredit}
+                            >
+                                <Text style={styles.saveButtonText}>Supprimer</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Pop-up message (Succès/Erreur) - RENDU EN DERNIER POUR ÊTRE AU-DESSUS */}
+            <Modal 
+                visible={popupVisible} 
+                transparent 
+                animationType="fade"
+            >
+                <View style={styles.popupOverlay}>
+                    <View
+                        style={[
+                            styles.popupBox,
+                            popupType === "error" ? styles.popupError : styles.popupSuccess,
+                        ]}
+                    >
+                        <Text style={styles.popupText}>{popupMessage}</Text>
+                        <TouchableOpacity onPress={() => setPopupVisible(false)}>
+                            <Text style={styles.closeText}>Fermer</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
 
-// Styles (Inchagné)
+// Styles (Inchangés, car ils étaient déjà corrects pour la mise en page)
 const styles = StyleSheet.create({
     container: { flex: 1, padding: 20, backgroundColor: "#E0F3FF" },
     loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 },
@@ -659,7 +700,26 @@ const styles = StyleSheet.create({
 
     tableContainer: { backgroundColor: "#fff", borderRadius: 10, overflow: "hidden" },
     tableHeader: { flexDirection: "row", backgroundColor: "#004080", padding: 10 },
-    headerText: { color: "#fff", fontWeight: "bold", textAlign: "center" },
+    headerText: { color: "#fff", fontWeight: "bold" },
+
+    // --- Styles spécifiques pour l'alignement des colonnes ---
+    headerMember: { flex: 2.5, textAlign: "left" },
+    cellMember: { flex: 2.5, textAlign: "left" },
+    
+    headerAmount: { flex: 1.5, textAlign: "center" },
+    cellAmount: { flex: 1.5, textAlign: "center" },
+
+    headerStatus: { flex: 1.5, textAlign: "center" },
+    cellStatus: { flex: 1.5, textAlign: "center" },
+
+    headerActions: { flex: 2, textAlign: "right" },
+    cellActions: { 
+        flex: 2, 
+        flexDirection: "row", 
+        minWidth: 100,
+    }, 
+    // --------------------------------------------------------
+
     tableRow: {
         flexDirection: "row",
         borderBottomWidth: 1,
@@ -668,8 +728,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 5,
         alignItems: "center",
     },
-    cellText: { fontSize: 14, color: "#000", textAlign: 'center' },
-    cellActions: { flexDirection: "row", justifyContent: "space-around", minWidth: 100 }, 
+    cellText: { fontSize: 14, color: "#000" },
     emptyText: { textAlign: "center", color: "#555", marginTop: 30, fontStyle: "italic" },
 
     popupOverlay: {

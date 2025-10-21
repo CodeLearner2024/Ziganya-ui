@@ -15,7 +15,7 @@ import axios from "axios";
 import { Picker } from "@react-native-picker/picker";
 
 // --- Configuration API et Constantes ---
-const API_BASE_URL = "http://192.168.40.90:8001/ziganya-managment-system/api/v1";
+const API_BASE_URL = "https://ziganya.onrender.com/ziganya-managment-system/api/v1";
 const DETAILS_API = `${API_BASE_URL}/association-details`;
 const SETTINGS_API = `${API_BASE_URL}/association-settings`;
 
@@ -33,7 +33,7 @@ const getBackendErrorMessage = (error) => {
         return data.message || data.errorMessage || JSON.stringify(data);
     } 
     else if (error.request) {
-        return "❌ Connexion au serveur échouée. Le backend n'est peut-être pas lancé ou l'adresse est incorrecte.";
+        return "Connexion au serveur échouée. Le backend n'est peut-être pas lancé ou l'adresse est incorrecte.";
     } 
     else if (error.message) {
         return `Une erreur s'est produite : ${error.message}`;

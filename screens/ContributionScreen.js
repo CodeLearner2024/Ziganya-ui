@@ -9,23 +9,21 @@ import {
     StyleSheet,
     ScrollView,
     ActivityIndicator,
-    Alert,
 } from "react-native";
-// Assurez-vous d'avoir installé ce package : npm install @react-native-picker/picker
 import { Picker } from "@react-native-picker/picker"; 
 import { MaterialIcons } from "@expo/vector-icons";
 import axios from "axios";
 
-// --- Configuration API et Constantes ---
-const API_BASE_URL = "http://192.168.40.90:8001/ziganya-managment-system/api/v1";
+// --- Configuration API ---
+const API_BASE_URL = "https://ziganya.onrender.com/ziganya-managment-system/api/v1";
 const MEMBERS_API = `${API_BASE_URL}/members`;
 const CONTRIBUTIONS_API = `${API_BASE_URL}/contributions`;
-// ----------------------------------------
 
-// Fonction utilitaire pour extraire le message d'erreur du backend
+// --- Fonction utilitaire ---
 const getBackendErrorMessage = (error) => {
     if (error.response && error.response.data) {
         const data = error.response.data;
+        // Essaie de trouver un message clair ou retourne une représentation JSON
         return data.message || data.errorMessage || JSON.stringify(data);
     } else if (error.message) {
         return error.message;
@@ -34,7 +32,6 @@ const getBackendErrorMessage = (error) => {
     }
 };
 
-// Obtient la date du jour au format YYYY-MM-DD
 const getTodayDate = () => {
     const date = new Date();
     const year = date.getFullYear();
@@ -49,20 +46,20 @@ export default function ContributionScreen() {
     const [members, setMembers] = useState([]); 
     const [loadingData, setLoadingData] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    
-    // Champs du formulaire de contribution
+
+    // Champs du formulaire
     const [amount, setAmount] = useState("");
     const [description, setDescription] = useState("");
     const [selectedMemberId, setSelectedMemberId] = useState(""); 
     const [contributionDate, setContributionDate] = useState(getTodayDate());
-    const [editingContributionId, setEditingContributionId] = useState(null); // ID de la contribution en cours d'édition
-    
-    // Pop-up messages succès/erreur
+    const [month, setMonth] = useState("JANUARY"); // ✅ Champ mois
+    const [editingContributionId, setEditingContributionId] = useState(null);
+
+    // Pop-up messages
     const [popupVisible, setPopupVisible] = useState(false);
     const [popupMessage, setPopupMessage] = useState("");
     const [popupType, setPopupType] = useState("success");
 
-    // Pop-up confirmation suppression
     const [confirmDeleteVisible, setConfirmDeleteVisible] = useState(false);
     const [contributionToDelete, setContributionToDelete] = useState(null);
 
@@ -70,78 +67,83 @@ export default function ContributionScreen() {
         setPopupMessage(message);
         setPopupType(type);
         setPopupVisible(true);
-        setTimeout(() => setPopupVisible(false), 3500);
+        // Masque le popup après 5 secondes, sauf si c'est pour une vue détaillée
+        if (type !== "view_detail") { 
+            setTimeout(() => setPopupVisible(false), 5000);
+        }
     };
 
-    // Réinitialiser les champs du formulaire
     const resetForm = () => {
         setAmount("");
         setDescription("");
         setContributionDate(getTodayDate()); 
+        setMonth("JANUARY"); // ✅ Réinitialisation du mois
         setEditingContributionId(null);
-        if (members.length > 0) {
+        // Initialise selectedMemberId au premier membre s'il existe
+        if (members.length > 0 && !selectedMemberId) {
             setSelectedMemberId(members[0].id); 
+        } else if (members.length === 0) {
+             setSelectedMemberId(""); // Réinitialise si aucun membre n'est chargé
         }
     };
 
-    // Charger les données (Membres pour le Picker et Contributions pour la Liste)
     const loadData = useCallback(async () => {
         setLoadingData(true);
         try {
-            // 1. Charger les membres (NÉCESSAIRE pour le Picker et pour l'initialisation)
             const membersResponse = await axios.get(MEMBERS_API);
             const membersData = membersResponse.data.map(m => ({
                 id: m.id.toString(),
                 name: m.firstname && m.lastname ? `${m.firstname} ${m.lastname}` : `Membre #${m.id}`,
             }));
             setMembers(membersData);
-            
-            // 2. Charger la liste des contributions
+
+            // S'assurer que l'ID du membre est sélectionné après chargement des membres
+            if (membersData.length > 0 && !selectedMemberId) {
+                setSelectedMemberId(membersData[0].id);
+            }
+
             const contributionsResponse = await axios.get(CONTRIBUTIONS_API);
             setContributions(contributionsResponse.data);
-
         } catch (error) {
             console.error("Erreur lors du chargement des données:", error);
             showPopup("Erreur de connexion. Impossible de charger les données.", "error");
         } finally {
             setLoadingData(false);
         }
-    }, []);
+    }, [selectedMemberId]); // Ajouté selectedMemberId pour la logique d'initialisation
 
     useEffect(() => {
         loadData();
     }, [loadData]);
 
-
-    // Fonction d'ajout/modification (CRUD - C & U)
     const saveContribution = async () => {
+        // Validation avant soumission
         if (!selectedMemberId || !amount || !description.trim()) {
             return showPopup("Veuillez remplir le membre, le montant et la description.", "error");
         }
-        if (isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+        const parsedAmount = parseFloat(amount);
+        if (isNaN(parsedAmount) || parsedAmount <= 0) {
             return showPopup("Le montant doit être un nombre positif.", "error");
         }
-        
+
         const payload = {
-            amount: parseFloat(amount),
+            amount: parsedAmount,
             description: description.trim(),
-            memberId: parseInt(selectedMemberId), // Envoie l'ID
+            memberId: parseInt(selectedMemberId),
             contributionDate: contributionDate,
+            month: month, // ✅ Ajout du champ month
         };
-        
+
         setIsSubmitting(true);
 
         try {
             if (editingContributionId) {
-                // Modification (PUT)
                 await axios.put(`${CONTRIBUTIONS_API}/${editingContributionId}`, payload);
                 showPopup("Contribution modifiée avec succès.", "success");
             } else {
-                // Ajout (POST)
                 await axios.post(CONTRIBUTIONS_API, payload);
-                showPopup(`Contribution de ${payload.amount} FBu enregistrée.`, "success");
+                showPopup(`Contribution de ${payload.amount.toLocaleString('fr-FR')} FBu enregistrée.`, "success");
             }
-            
             setModalVisible(false);
             resetForm();
             loadData(); 
@@ -153,32 +155,28 @@ export default function ContributionScreen() {
         }
     };
 
-    // Préparer l'édition (Similaire à editMember)
     const editContribution = (contribution) => {
-        // Remplir les champs avec les données de la contribution
-        setAmount(contribution.amount.toString());
-        setDescription(contribution.description);
-        setContributionDate(contribution.contributionDate);
-        setSelectedMemberId(contribution.member.id.toString());
+        setAmount(contribution.amount ? contribution.amount.toString() : "");
+        setDescription(contribution.description || "");
+        setContributionDate(contribution.contributionDate || getTodayDate());
+        setMonth(contribution.month || "JANUARY"); // ✅ Affichage du mois
+        // S'assurer que l'ID du membre est une chaîne de caractères
+        setSelectedMemberId(contribution.member?.id?.toString() || contribution.memberId?.toString() || "");
         setEditingContributionId(contribution.id);
         setModalVisible(true);
     };
 
-    // Préparer la confirmation de suppression (Similaire à confirmDeleteMember)
     const confirmDeleteContribution = (contribution) => {
         setContributionToDelete(contribution);
         setConfirmDeleteVisible(true);
     };
 
-    // Exécuter la suppression (CRUD - D)
     const performDeleteContribution = async () => {
         if (!contributionToDelete) return;
-        
         const contributionId = contributionToDelete.id;
         const memberName = contributionToDelete.member 
             ? `${contributionToDelete.member.firstname} ${contributionToDelete.member.lastname}` 
             : `ID ${contributionId}`;
-
         try {
             await axios.delete(`${CONTRIBUTIONS_API}/${contributionId}`);
             loadData();
@@ -192,39 +190,36 @@ export default function ContributionScreen() {
         }
     };
 
-
-    // Afficher les détails (Similaire à viewMember)
     const viewContribution = (item) => {
         const memberName = item.member 
             ? `${item.member.firstname} ${item.member.lastname}` 
             : `ID ${item.memberId}`;
-        showPopup(
-            `💰 ${item.amount.toLocaleString('fr-FR')} FBu\n👤 Membre: ${memberName}\n📅 Date: ${item.contributionDate}\n📝 Desc: ${item.description}`,
-            "success"
-        );
+        // Utiliser un affichage plus propre ou simplement un popup standard
+        const detailMessage = 
+            `💰 Montant: ${item.amount ? item.amount.toLocaleString('fr-FR') : 'N/A'} FBu\n` +
+            `👤 Membre: ${memberName}\n` +
+            `📅 Date: ${item.contributionDate || 'N/A'}\n` +
+            `🗓 Mois: ${item.month || 'N/A'}\n` +
+            `📝 Description: ${item.description || 'N/A'}`;
+            
+        showPopup(detailMessage, "view_detail"); // Utiliser un type pour ne pas masquer automatiquement
     };
 
-
-    // Le composant d'une ligne de la liste
     const ContributionItem = ({ item }) => {
         const memberName = item.member 
             ? `${item.member.firstname} ${item.member.lastname}` 
             : `ID Inconnu (${item.memberId || 'N/A'})`;
-
         return (
             <View style={styles.tableRow}>
-                <Text style={[styles.cellText, { flex: 2 }]}>{memberName}</Text>
+                <Text style={[styles.cellText, { flex: 2, textAlign: 'left', paddingLeft: 5 }]}>{memberName}</Text>
                 <Text style={[styles.cellText, { flex: 2 }]}>{item.amount ? item.amount.toLocaleString('fr-FR') : '0'} FBu</Text>
                 <View style={[styles.cellActions, { flex: 1.5 }]}>
-                    {/* Bouton Détails */}
                     <TouchableOpacity onPress={() => viewContribution(item)}>
                         <MaterialIcons name="info" size={22} color="#004080" />
                     </TouchableOpacity>
-                    {/* Bouton Modifier */}
                     <TouchableOpacity onPress={() => editContribution(item)}>
                         <MaterialIcons name="edit" size={22} color="#FFA500" /> 
                     </TouchableOpacity>
-                    {/* Bouton Supprimer */}
                     <TouchableOpacity onPress={() => confirmDeleteContribution(item)}>
                         <MaterialIcons name="delete" size={22} color="#FF0000" />
                     </TouchableOpacity>
@@ -235,25 +230,8 @@ export default function ContributionScreen() {
 
     return (
         <View style={styles.container}>
-            
-            {/* Pop-up message (Succès/Erreur) */}
-            <Modal visible={popupVisible} transparent animationType="fade">
-                <View style={styles.popupOverlay}>
-                    <View
-                        style={[
-                            styles.popupBox,
-                            popupType === "error" ? styles.popupError : styles.popupSuccess,
-                        ]}
-                    >
-                        <Text style={styles.popupText}>{popupMessage}</Text>
-                        <TouchableOpacity onPress={() => setPopupVisible(false)}>
-                            <Text style={styles.closeText}>Fermer</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
-            
-            {/* Pop-up confirmation suppression */}
+
+            {/* Confirmation suppression */}
             <Modal visible={confirmDeleteVisible} transparent animationType="fade">
                 <View style={styles.popupOverlay}>
                     <View style={[styles.popupBox, { borderTopColor: "orange", borderTopWidth: 6 }]}>
@@ -278,14 +256,11 @@ export default function ContributionScreen() {
                 </View>
             </Modal>
 
-
-            {/* Bouton ajouter contribution */}
+            {/* Bouton ajouter */}
             <TouchableOpacity 
                 style={styles.addButton} 
-                onPress={() => {
-                    resetForm();
-                    setModalVisible(true);
-                }}
+                onPress={() => { resetForm(); setSelectedMemberId(members.length > 0 ? members[0].id : ""); setModalVisible(true); }}
+                disabled={members.length === 0 && !loadingData} // Désactiver si on charge ou s'il n'y a pas de membres
             >
                 <Text style={styles.addButtonText}>➕ Ajouter une contribution</Text>
             </TouchableOpacity>
@@ -298,8 +273,7 @@ export default function ContributionScreen() {
                             {editingContributionId ? "Modifier la Contribution" : "Enregistrer une Contribution"}
                         </Text>
                         <ScrollView>
-                            
-                            {/* Champ Membre (Dropdown) */}
+                            {/* Membre */}
                             <Text style={styles.label}>Membre</Text>
                             <View style={styles.pickerContainer}>
                                 {loadingData && members.length === 0 ? (
@@ -315,7 +289,7 @@ export default function ContributionScreen() {
                                             <Picker.Item 
                                                 key={member.id} 
                                                 label={member.name} 
-                                                value={member.id}   
+                                                value={member.id}  
                                             />
                                         ))}
                                     </Picker>
@@ -324,7 +298,7 @@ export default function ContributionScreen() {
                                 )}
                             </View>
 
-                            {/* Champ Montant */}
+                            {/* Montant */}
                             <Text style={styles.label}>Montant (FBu)</Text>
                             <TextInput
                                 style={styles.input}
@@ -335,7 +309,7 @@ export default function ContributionScreen() {
                                 editable={!isSubmitting}
                             />
 
-                            {/* Champ Description */}
+                            {/* Description */}
                             <Text style={styles.label}>Description</Text>
                             <TextInput
                                 style={styles.input}
@@ -345,7 +319,31 @@ export default function ContributionScreen() {
                                 editable={!isSubmitting}
                             />
 
-                            {/* Champ Date */}
+                            {/* Mois */}
+                            <Text style={styles.label}>Mois</Text>
+                            <View style={styles.pickerContainer}>
+                                <Picker
+                                    selectedValue={month}
+                                    onValueChange={(value) => setMonth(value)}
+                                    style={styles.picker}
+                                    enabled={!isSubmitting}
+                                >
+                                    <Picker.Item label="JANUARY" value="JANUARY" />
+                                    <Picker.Item label="FEBRUARY" value="FEBRUARY" />
+                                    <Picker.Item label="MARCH" value="MARCH" />
+                                    <Picker.Item label="APRIL" value="APRIL" />
+                                    <Picker.Item label="MAY" value="MAY" />
+                                    <Picker.Item label="JUNE" value="JUNE" />
+                                    <Picker.Item label="JULY" value="JULY" />
+                                    <Picker.Item label="AUGUST" value="AUGUST" />
+                                    <Picker.Item label="SEPTEMBER" value="SEPTEMBER" />
+                                    <Picker.Item label="OCTOBER" value="OCTOBER" />
+                                    <Picker.Item label="NOVEMBER" value="NOVEMBER" />
+                                    <Picker.Item label="DECEMBER" value="DECEMBER" />
+                                </Picker>
+                            </View>
+
+                            {/* Date */}
                             <Text style={styles.label}>Date (YYYY-MM-DD)</Text>
                             <TextInput
                                 style={styles.input}
@@ -355,6 +353,7 @@ export default function ContributionScreen() {
                                 editable={!isSubmitting}
                             />
 
+                            {/* Boutons */}
                             <View style={styles.modalButtons}>
                                 <TouchableOpacity 
                                     style={styles.saveButton} 
@@ -371,10 +370,7 @@ export default function ContributionScreen() {
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={styles.cancelButton}
-                                    onPress={() => {
-                                        setModalVisible(false);
-                                        resetForm();
-                                    }}
+                                    onPress={() => { setModalVisible(false); resetForm(); }}
                                     disabled={isSubmitting}
                                 >
                                     <Text style={styles.cancelButtonText}>Annuler</Text>
@@ -385,7 +381,7 @@ export default function ContributionScreen() {
                 </View>
             </Modal>
 
-            {/* Liste des contributions */}
+            {/* Liste */}
             {loadingData ? (
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color="#004080" />
@@ -394,7 +390,7 @@ export default function ContributionScreen() {
             ) : contributions.length > 0 ? (
                 <View style={styles.tableContainer}>
                     <View style={styles.tableHeader}>
-                        <Text style={[styles.headerText, { flex: 2 }]}>Membre</Text>
+                        <Text style={[styles.headerText, { flex: 2, textAlign: 'left', paddingLeft: 5 }]}>Membre</Text>
                         <Text style={[styles.headerText, { flex: 2 }]}>Montant</Text>
                         <Text style={[styles.headerText, { flex: 1.5 }]}>Actions</Text>
                     </View>
@@ -407,114 +403,63 @@ export default function ContributionScreen() {
             ) : (
                 <Text style={styles.emptyText}>Aucune contribution enregistrée</Text>
             )}
+
+            {/* --- POPUP MESSAGE (PLACÉ EN DERNIER POUR ÊTRE AU-DESSUS) --- */}
+            <Modal visible={popupVisible} transparent animationType="fade" onRequestClose={() => setPopupVisible(false)}>
+                <View style={styles.popupOverlay}>
+                    <View style={[
+                        styles.popupBox,
+                        popupType === "error" ? styles.popupError : 
+                        popupType === "view_detail" ? { backgroundColor: "#fff", borderTopColor: "#004080", borderTopWidth: 6 } : 
+                        styles.popupSuccess,
+                    ]}>
+                        <Text style={styles.popupText}>{popupMessage}</Text>
+                        <TouchableOpacity onPress={() => setPopupVisible(false)}>
+                            <Text style={styles.closeText}>Fermer</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
 
-// Styles (Inchagné)
+// --- Styles ---
 const styles = StyleSheet.create({
     container: { flex: 1, padding: 20, backgroundColor: "#E0F3FF" },
     loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 },
-    
-    addButton: {
-        backgroundColor: "#004080",
-        padding: 15,
-        borderRadius: 10,
-        alignItems: "center",
-        marginBottom: 20,
-    },
+    addButton: { backgroundColor: "#004080", padding: 15, borderRadius: 10, alignItems: "center", marginBottom: 20 },
     addButtonText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
-
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: "rgba(0,0,0,0.5)",
-        justifyContent: "center",
-        alignItems: "center",
-    },
-    modalContainer: {
-        width: "90%",
-        backgroundColor: "#fff",
-        borderRadius: 10,
-        padding: 20,
-        maxHeight: "85%",
-    },
-    modalTitle: {
-        fontSize: 20,
-        fontWeight: "bold",
-        marginBottom: 15,
-        textAlign: "center",
-    },
+    modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" },
+    modalContainer: { width: "90%", backgroundColor: "#fff", borderRadius: 10, padding: 20, maxHeight: "95%" },
+    modalTitle: { fontSize: 20, fontWeight: "bold", marginBottom: 15, textAlign: "center", color: "#004080" },
     label: { fontWeight: "bold", marginBottom: 5, color: "#004080", marginTop: 10 },
-    input: {
-        borderWidth: 1,
-        borderColor: "#ccc",
-        borderRadius: 8,
-        padding: 10,
-        marginBottom: 15,
-    },
-    pickerContainer: {
-        borderWidth: 1,
-        borderColor: "#ccc",
-        borderRadius: 8,
-        marginBottom: 15,
-        overflow: 'hidden',
-        backgroundColor: '#fff',
-    },
-    picker: {
-        height: 40,
-        width: '100%',
-    },
-    
-    modalButtons: { flexDirection: "row", justifyContent: "space-between", marginTop: 10 },
-    saveButton: {
-        backgroundColor: "#004080",
-        padding: 12,
-        borderRadius: 8,
-        flex: 1,
-        marginRight: 5,
-        alignItems: "center",
-    },
+    input: { borderWidth: 1, borderColor: "#ccc", borderRadius: 8, padding: 10, marginBottom: 15, backgroundColor: '#fff' },
+    pickerContainer: { borderWidth: 1, borderColor: "#ccc", borderRadius: 8, marginBottom: 15, overflow: 'hidden', backgroundColor: '#fff' },
+    picker: { height: 40, width: '100%' },
+    modalButtons: { flexDirection: "row", justifyContent: "space-between", marginTop: 10, marginBottom: 10 },
+    saveButton: { backgroundColor: "#004080", padding: 12, borderRadius: 8, flex: 1, marginRight: 5, alignItems: "center" },
     saveButtonText: { color: "#fff", fontWeight: "bold" },
-    cancelButton: {
-        backgroundColor: "#ccc",
-        padding: 12,
-        borderRadius: 8,
-        flex: 1,
-        marginLeft: 5,
-        alignItems: "center",
-    },
+    cancelButton: { backgroundColor: "#ccc", padding: 12, borderRadius: 8, flex: 1, marginLeft: 5, alignItems: "center" },
     cancelButtonText: { fontWeight: "bold" },
-
-    tableContainer: { backgroundColor: "#fff", borderRadius: 10, overflow: "hidden" },
+    tableContainer: { backgroundColor: "#fff", borderRadius: 10, overflow: "hidden", flex: 1 },
     tableHeader: { flexDirection: "row", backgroundColor: "#004080", padding: 10 },
     headerText: { color: "#fff", fontWeight: "bold", textAlign: "center" },
-    tableRow: {
-        flexDirection: "row",
-        borderBottomWidth: 1,
-        borderBottomColor: "#ccc",
-        paddingVertical: 10,
-        paddingHorizontal: 5,
-        alignItems: "center",
-    },
-    cellText: { fontSize: 14, color: "#000", textAlign: 'center' },
+    tableRow: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#f0f0f0", paddingVertical: 12, paddingHorizontal: 5, backgroundColor: '#fff' },
+    cellText: { fontSize: 14, color: "#333", textAlign: 'center' },
     cellActions: { flexDirection: "row", justifyContent: "space-around" },
     emptyText: { textAlign: "center", color: "#555", marginTop: 30, fontStyle: "italic" },
-
-    popupOverlay: {
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
+    popupOverlay: { 
+        flex: 1, 
+        justifyContent: "center", 
+        alignItems: "center", 
         backgroundColor: "rgba(0,0,0,0.4)",
+        zIndex: 9999,    
+        elevation: 10,     
     },
-    popupBox: {
-        width: "80%",
-        backgroundColor: "#fff",
-        borderRadius: 10,
-        padding: 20,
-        alignItems: "center",
-    },
-    popupError: { borderTopWidth: 6, borderTopColor: "red" },
-    popupSuccess: { borderTopWidth: 6, borderTopColor: "green" },
-    popupText: { fontSize: 16, textAlign: "center", marginBottom: 10 },
-    closeText: { color: "#004080", fontWeight: "bold" },
+    popupBox: { width: "80%", padding: 20, borderRadius: 10, alignItems: "center" },
+    popupSuccess: { backgroundColor: "#E0FBE2", borderTopWidth: 6, borderTopColor: "#00C851" },
+    popupError: { backgroundColor: "#FFE5E5", borderTopWidth: 6, borderTopColor: "#FF0000" },
+    popupText: { fontSize: 16, textAlign: "center", marginBottom: 10, color: "#333" },
+    closeText: { fontWeight: "bold", color: "#004080" },
 });
