@@ -1,33 +1,32 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ActivityIndicator, ScrollView, ImageBackground, Dimensions } from "react-native";
 import axios from "axios";
-import { PieChart } from "react-native-chart-kit"; 
+import { PieChart } from "react-native-chart-kit";
 
-// --- Configuration du Graphique ---
+// --- Configuration et Constantes ---
+
+// Largeur de l'écran (pour le graphique)
 const screenWidth = Dimensions.get("window").width;
+// Largeur maximale du contenu (pour éviter l'étirement sur grands écrans/tablettes)
+const MAX_CONTENT_WIDTH = 600; 
+
 const chartConfig = {
-  backgroundColor: "#ffffff",
-  backgroundGradientFrom: "#FFFFFF",
-  backgroundGradientTo: "#F7F9FC",
-  color: (opacity = 1) => `rgba(0, 88, 168, ${opacity})`, 
-  labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+    backgroundColor: "#ffffff",
+    backgroundGradientFrom: "#FFFFFF",
+    backgroundGradientTo: "#F7F9FC",
+    color: (opacity = 1) => `rgba(0, 88, 168, ${opacity})`, 
+    labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
 };
 
-// --- COULEURS SYNCHRONISÉES ---
 const CURRENT_BALANCE_COLOR = '#1E90FF'; // Bleu Vif
-const LOAN_BALANCE_COLOR = '#FF6347';      // Rouge Corail
-// -----------------------------
+const LOAN_BALANCE_COLOR = '#FF6347';      // Rouge Corail
 
-// URL pour l'image de fond (inchangée)
 const BACKGROUND_IMAGE_URI = 'https://i.imgur.com/gK9lYpS.png'; 
-
 
 // Composant pour le graphique (maintenant un Pie Chart)
 const BalancePieChart = ({ currentBalance, loanBalance }) => {
-    
     const totalBalance = currentBalance + loanBalance;
     
-    // Gérer le cas où le total est zéro
     if (!totalBalance || totalBalance === 0) {
       return (
         <View style={chartStyles.chartContainer}>
@@ -42,22 +41,24 @@ const BalancePieChart = ({ currentBalance, loanBalance }) => {
     
     const data = [
       {
-        // Nom vide pour masquer l'étiquette (les petits cercles)
-        name: ``, 
+        // CORRECTION: Utilisation de guillemets droits simples ou doubles pour une chaîne vide
+        // Ceci garantit qu'il n'y a pas de problème de parsing de caractère.
+        name: "", 
         population: currentBalance, 
         color: CURRENT_BALANCE_COLOR,
       },
       {
-        name: ``,
+        name: "",
         population: loanBalance,
         color: LOAN_BALANCE_COLOR,
       }
     ];
 
+    // Calcul de la largeur du graphique pour l'adaptabilité
+    const chartWidth = Math.min(screenWidth, MAX_CONTENT_WIDTH) * 0.9;
+
     return (
         <View style={chartStyles.chartContainer}>
-            {/* <Text style={chartStyles.chartTitle}>Répartition des Soldes (Total de ${totalBalance.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, " ")} FBu)</Text> */}
-            
             {/* Légende personnalisée (avec Rectangles) */}
             <View style={chartStyles.legendContainer}>
                 <View style={chartStyles.legendItem}>
@@ -73,7 +74,7 @@ const BalancePieChart = ({ currentBalance, loanBalance }) => {
             {/* Diagramme Circulaire */}
             <PieChart
                 data={data}
-                width={screenWidth * 0.9} 
+                width={chartWidth} // Utilise la largeur calculée
                 height={220}
                 chartConfig={chartConfig}
                 accessor={"population"} 
@@ -90,15 +91,19 @@ export default function DashboardScreen() {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // CORRECTION DE L'URL: Assurez-vous que l'URL locale est accessible.
+  // L'utilisation d'une adresse IP privée comme 192.168.x.x est courante en développement,
+  // mais une URL non atteignable peut générer une erreur fatale dans certains environnements.
+  const API_URL = "https://ziganya.onrender.com/ziganya-managment-system/api/v1/reports";
+
   useEffect(() => {
     const fetchReport = async () => {
       try {
-        const response = await axios.get(
-          "http://192.168.40.90:8001/ziganya-managment-system/api/v1/reports"
-        );
+        const response = await axios.get(API_URL);
         setReport(response.data);
       } catch (error) {
-        console.error("Erreur lors du chargement du rapport :", error);
+        // Loggez l'erreur de manière plus sécurisée, sans exposer tout l'objet d'erreur
+        console.error("Erreur lors du chargement du rapport. Vérifiez l'URL et l'état du serveur.", error.message);
       } finally {
         setLoading(false);
       }
@@ -118,81 +123,90 @@ export default function DashboardScreen() {
   if (!report) {
     return (
       <View style={styles.container}>
-        <Text style={styles.errorText}>Impossible de charger les données.</Text>
+        <Text style={styles.errorText}>Impossible de charger les données. Vérifiez la connexion.</Text>
       </View>
     );
   }
   
   // Formatage des valeurs
   const formatValue = (value) => {
-    return value ? value.toLocaleString('fr-FR') : '0';
+    // Ajout d'une vérification de type pour éviter des erreurs potentielles de toLocaleString
+    return typeof value === 'number' ? value.toLocaleString('fr-FR') : '0';
   };
   
   const formatCurrency = (value) => {
-    return value ? `${value.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, " ")} FBu` : '0.00 FBu';
+    // Ajout d'une vérification de type pour toFixed
+    if (typeof value === 'number') {
+        return `${value.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, " ")} FBu`;
+    }
+    return '0.00 FBu';
   };
 
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      {/* Simulation de l'entête et du fond de l'image (inchangé) */}
-      <View style={styles.headerContainer}>
-        <ImageBackground
-          source={{ uri: BACKGROUND_IMAGE_URI }}
-          style={styles.imageBackground}
-          imageStyle={styles.imageStyle}
-        >
-          <View style={styles.overlay} /> 
+        {/* Entête et fond de l'image (pleine largeur) */}
+        <View style={styles.headerContainer}>
+            <ImageBackground
+              source={{ uri: BACKGROUND_IMAGE_URI }}
+              style={styles.imageBackground}
+              imageStyle={styles.imageStyle}
+            >
+                <View style={styles.overlay} /> 
 
-          <Text style={styles.mainTitle}>
-            <Text style={{fontWeight: '900'}}>ZIGANYA</Text>{"\n"}
-            <Text style={{fontSize: 14}}>MANAGEMENT SYSTEM</Text>
-          </Text>
-        
-          
-          {report.message && (
-            <View style={styles.messageBox}>
-              <Text style={styles.messageText}>{report.message}</Text>
+                <Text style={styles.mainTitle}>
+                    <Text style={{fontWeight: '900'}}>ZIGANYA</Text>{"\n"}
+                    <Text style={{fontSize: 14}}>MANAGEMENT SYSTEM</Text>
+                </Text>
+            
+                {report.message && (
+                    <View style={styles.messageBox}>
+                        <Text style={styles.messageText}>{report.message}</Text>
+                    </View>
+                )}
+            </ImageBackground>
+        </View>
+
+        {/* CONTENEUR PRINCIPAL du CONTENU: Limite la largeur du contenu pour l'adaptabilité */}
+        <View style={styles.mainContentContainer}>
+            {/* Les cartes de données */}
+            <View style={styles.dataCardsContainer}>
+                <View style={styles.row}>
+                  <View style={[styles.gridItem, styles.greenCard]}>
+                    <Text style={styles.gridValue}>{formatValue(report.totalMembers)}</Text>
+                    <Text style={styles.gridTitle}>MEMBRES</Text>
+                  </View>
+                  <View style={[styles.gridItem, styles.blueCard]}>
+                    <Text style={styles.gridValue}>{formatValue(report.totalActions)}</Text>
+                    <Text style={styles.gridTitle}>ACTIONS</Text>
+                  </View>
+                </View>
+
+                <View style={styles.row}>
+                  <View style={[styles.gridItem, styles.yellowCard]}>
+                    <Text style={styles.gridValue}>{formatCurrency(report.totalCurrentBalance)}</Text>
+                    <Text style={styles.gridTitle}>SOLDE ACTUEL</Text>
+                  </View>
+                  <View style={[styles.gridItem, styles.redCard]}>
+                    <Text style={styles.gridValue}>{formatCurrency(report.totalLoanBalance)}</Text>
+                    <Text style={styles.gridTitle}>SOLDE DES CRÉDITS</Text>
+                  </View>
+                </View>
             </View>
-          )}
-
-        </ImageBackground>
-      </View>
-
-      {/* Les cartes de données (inchangées) */}
-      <View style={styles.dataCardsContainer}>
-        <View style={styles.row}>
-          <View style={[styles.gridItem, styles.greenCard]}>
-            <Text style={styles.gridValue}>{formatValue(report.totalMembers)}</Text>
-            <Text style={styles.gridTitle}>MEMBRES</Text>
-          </View>
-          <View style={[styles.gridItem, styles.blueCard]}>
-            <Text style={styles.gridValue}>{formatValue(report.totalActions)}</Text>
-            <Text style={styles.gridTitle}>ACTIONS</Text>
-          </View>
+            
+            {/* Le Diagramme Circulaire (Pie Chart) */}
+            <BalancePieChart 
+              currentBalance={report.totalCurrentBalance}
+              loanBalance={report.totalLoanBalance}
+            /> 
         </View>
-
-        <View style={styles.row}>
-          <View style={[styles.gridItem, styles.yellowCard]}>
-            <Text style={styles.gridValue}>{formatCurrency(report.totalCurrentBalance)}</Text>
-            <Text style={styles.gridTitle}>SOLDE ACTUEL</Text>
-          </View>
-          <View style={[styles.gridItem, styles.redCard]}>
-            <Text style={styles.gridValue}>{formatCurrency(report.totalLoanBalance)}</Text>
-            <Text style={styles.gridTitle}>SOLDE DES CRÉDITS</Text>
-          </View>
-        </View>
-      </View>
-      
-      {/* Le Diagramme Circulaire (Pie Chart) sans étiquettes ni montants */}
-      <BalancePieChart 
-        currentBalance={report.totalCurrentBalance}
-        loanBalance={report.totalLoanBalance}
-      />    
-
     </ScrollView>
   );
 }
+
+// ----------------------------------------------------------------------
+// STYLES
+// ----------------------------------------------------------------------
 
 const styles = StyleSheet.create({
   container: {
@@ -207,7 +221,15 @@ const styles = StyleSheet.create({
     backgroundColor: "#F4F7FF",
   },
   
-  // ... (Styles de l'entête et des cartes - inchangés) ...
+  // NOUVEAU CONTENEUR pour limiter la largeur du contenu sur les grands écrans
+  mainContentContainer: {
+      width: '100%',
+      maxWidth: MAX_CONTENT_WIDTH, 
+      alignSelf: 'center', 
+      paddingHorizontal: 15, // Marge latérale
+  },
+
+  /* Entête (pleine largeur) */
   headerContainer: {
     width: '100%',
     height: 250,
@@ -238,18 +260,6 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
   },
-  messageTitle: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#FFD700',
-    textAlign: 'center',
-    marginTop: 15,
-  },
-  messageSubtitle: {
-    fontSize: 13,
-    fontWeight: 'normal',
-    color: '#FFFFFF',
-  },
   messageBox: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     paddingVertical: 5,
@@ -264,10 +274,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
-  
+
   /* Styles des cartes de données */
   dataCardsContainer: {
-    paddingHorizontal: 15,
     marginTop: -40,
     zIndex: 10,
   },
@@ -278,7 +287,7 @@ const styles = StyleSheet.create({
   },
   gridItem: {
     flex: 1,
-    marginHorizontal: 5,
+    marginHorizontal: 5, // Ajout de petites marges entre les cartes
     paddingVertical: 15,
     paddingHorizontal: 10,
     borderRadius: 10,
@@ -326,27 +335,6 @@ const styles = StyleSheet.create({
     borderBottomColor: '#C9302C',
   },
   
-  /* Style du bouton "En savoir plus" simulé */
-  simulatedLinkContainer: {
-    backgroundColor: '#0058A8',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 5,
-    marginHorizontal: 15,
-    marginTop: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 1 },
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  simulatedLinkText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
   errorText: {
     color: "red",
     fontSize: 16,
@@ -359,7 +347,6 @@ const chartStyles = StyleSheet.create({
     chartContainer: {
         marginVertical: 20,
         alignItems: 'center',
-        paddingHorizontal: 15,
     },
     chartTitle: {
         fontSize: 14,

@@ -15,7 +15,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import axios from "axios";
 
 // --- Configuration API et Constantes ---
-const API_BASE_URL = "http://localhost:8001/ziganya-managment-system/api/v1";
+const API_BASE_URL = "https://ziganya.onrender.com/ziganya-managment-system/api/v1";
 const REFUNDS_API = `${API_BASE_URL}/refunds`;
 const CREDITS_API = `${API_BASE_URL}/credits`;
 // ----------------------------------------

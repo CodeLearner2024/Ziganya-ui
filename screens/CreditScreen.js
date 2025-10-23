@@ -15,7 +15,7 @@ import { MaterialIcons, FontAwesome } from "@expo/vector-icons";
 import axios from "axios";
 
 // --- Configuration API et Constantes ---
-const API_BASE_URL = "http://localhost:8001/ziganya-managment-system/api/v1";
+const API_BASE_URL = "https://ziganya.onrender.com/ziganya-managment-system/api/v1";
 const MEMBERS_API = `${API_BASE_URL}/members`;
 const CREDITS_API = `${API_BASE_URL}/credits`;
 const CREDIT_TREATMENT_API = `${API_BASE_URL}/credit-traitment`;
@@ -38,7 +38,7 @@ const getBackendErrorMessage = (error) => {
     // Cas 2 : Le serveur n'a pas répondu (ex: serveur éteint, mauvaise URL)
     else if (error.request) {
         // Axios error sans réponse du serveur (Network Error, Timeout)
-        return "❌ Connexion au serveur échouée. Le backend n'est peut-être pas lancé ou l'adresse est incorrecte.";
+        return "Connexion au serveur échouée. Le backend n'est peut-être pas lancé ou l'adresse est incorrecte.";
     } 
     // Cas 3 : Autres erreurs (ex: Erreur de configuration de la requête)
     else if (error.message) {
@@ -240,11 +240,11 @@ export default function CreditScreen() {
         
         showPopup(
             `💰 Montant: ${item.amount.toLocaleString('fr-FR')} FBu
-📅 Date: ${item.creditDate}
+Date: ${item.creditDate}
 % Taux: ${item.interestRate}%
-💵 Total à payer: ${totalAmount} FBu
-🏷️ Statut: ${item.creditDecision}
-👤 Membre: ${memberName}`,
+Total à payer: ${totalAmount} FBu
+Statut: ${item.creditDecision}
+Membre: ${memberName}`,
             "success"
         );
     };
@@ -520,7 +520,7 @@ export default function CreditScreen() {
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContainer}>
                         <Text style={styles.modalTitle}>
-                            Traiter le Crédit #{creditToTreat?.id}
+                            Traiter le Crédit {creditToTreat?.id}
                         </Text>
                         
                         <Text style={styles.label}>
