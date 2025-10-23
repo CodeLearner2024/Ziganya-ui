@@ -15,7 +15,7 @@ import axios from "axios";
 import { Picker } from "@react-native-picker/picker";
 
 // --- Configuration API et Constantes ---
-const API_BASE_URL = "https://ziganya.onrender.com/ziganya-managment-system/api/v1";
+const API_BASE_URL = "http://localhost:8001/ziganya-managment-system/api/v1";
 const DETAILS_API = `${API_BASE_URL}/association-details`;
 const SETTINGS_API = `${API_BASE_URL}/association-settings`;
 

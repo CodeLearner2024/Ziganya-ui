@@ -8,6 +8,7 @@ import DashboardScreen from './screens/DashboardScreen'
 import ContributionScreen from './screens/ContributionScreen'
 import CreditScreen from './screens/CreditScreen';
 import AssociationScreen from './screens/AssociationScreen'
+import RefundScreen from './screens/RefundScreen'
 
 const Stack = createNativeStackNavigator();
 
@@ -37,7 +38,11 @@ export default function App() {
           component={DashboardScreen} 
           options={{ title: 'Dashboard' }} // ✅ Ajout de la nouvelle page
         />
-
+        <Stack.Screen 
+          name="Remboursement" 
+          component={RefundScreen}
+          options={{ title: 'Remboursement' }} // ✅ Ajout de la nouvelle page
+        />
 
         <Stack.Screen 
   name="Contribution" 
