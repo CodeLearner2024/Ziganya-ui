@@ -9,6 +9,7 @@ import ContributionScreen from './screens/ContributionScreen'
 import CreditScreen from './screens/CreditScreen';
 import AssociationScreen from './screens/AssociationScreen'
 import RefundScreen from './screens/RefundScreen'
+import ReportScreen from './screens/ReportScreen'
 
 const Stack = createNativeStackNavigator();
 
@@ -59,6 +60,11 @@ export default function App() {
   name="Parametres" 
   component={AssociationScreen} 
   options={{ title: 'Parametres' }} 
+/>
+<Stack.Screen 
+  name="Report" 
+  component={ReportScreen}
+  options={{ title: 'Report' }} 
 />
     
       </Stack.Navigator>
