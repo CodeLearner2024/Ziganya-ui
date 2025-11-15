@@ -95,6 +95,7 @@ export default function DashboardScreen() {
   // L'utilisation d'une adresse IP privée comme 192.168.x.x est courante en développement,
   // mais une URL non atteignable peut générer une erreur fatale dans certains environnements.
   const API_URL = "https://ziganya.onrender.com/ziganya-managment-system/api/v1/reports";
+  // const API_URL = "http://localhost:8001/ziganya-managment-system/api/v1/reports";
 
   useEffect(() => {
     const fetchReport = async () => {

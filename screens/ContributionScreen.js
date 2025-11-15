@@ -9,21 +9,29 @@ import {
     StyleSheet,
     ScrollView,
     ActivityIndicator,
+    Alert,
 } from "react-native";
-import { Picker } from "@react-native-picker/picker"; 
+import { Picker } from "@react-native-picker/picker";
 import { MaterialIcons } from "@expo/vector-icons";
 import axios from "axios";
 
 // --- Configuration API ---
 const API_BASE_URL = "https://ziganya.onrender.com/ziganya-managment-system/api/v1";
+// const API_BASE_URL = "http://localhost:8001/ziganya-managment-system/api/v1";
+
 const MEMBERS_API = `${API_BASE_URL}/members`;
 const CONTRIBUTIONS_API = `${API_BASE_URL}/contributions`;
+
+// --- Énumération ContributionStatus (Type de Contribution) ---
+const CONTRIBUTION_STATUSES = [
+    { label: "Activation du Compte", value: "ACTIVATION_ACCOUNT" },
+    { label: "Contribution Mensuelle", value: "CONTRIBUTION" },
+];
 
 // --- Fonction utilitaire ---
 const getBackendErrorMessage = (error) => {
     if (error.response && error.response.data) {
         const data = error.response.data;
-        // Essaie de trouver un message clair ou retourne une représentation JSON
         return data.message || data.errorMessage || JSON.stringify(data);
     } else if (error.message) {
         return error.message;
@@ -40,19 +48,28 @@ const getTodayDate = () => {
     return `${year}-${month}-${day}`;
 };
 
+// Fonction pour obtenir le label lisible du statut/type
+const getStatusLabel = (statusValue) => {
+    const status = CONTRIBUTION_STATUSES.find(s => s.value === statusValue);
+    return status ? status.label : statusValue || 'N/A';
+};
+
+// --- Composant principal ---
 export default function ContributionScreen() {
     const [modalVisible, setModalVisible] = useState(false);
     const [contributions, setContributions] = useState([]);
-    const [members, setMembers] = useState([]); 
+    const [members, setMembers] = useState([]);
     const [loadingData, setLoadingData] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Champs du formulaire
     const [amount, setAmount] = useState("");
     const [description, setDescription] = useState("");
-    const [selectedMemberId, setSelectedMemberId] = useState(""); 
+    const [selectedMemberId, setSelectedMemberId] = useState("");
     const [contributionDate, setContributionDate] = useState(getTodayDate());
-    const [month, setMonth] = useState("JANUARY"); // ✅ Champ mois
+    const [month, setMonth] = useState("JANUARY");
+    // ❌ Suppression de [latePenaltyAmount, setLatePenaltyAmount]
+    const [status, setStatus] = useState(CONTRIBUTION_STATUSES[0].value);
     const [editingContributionId, setEditingContributionId] = useState(null);
 
     // Pop-up messages
@@ -67,8 +84,7 @@ export default function ContributionScreen() {
         setPopupMessage(message);
         setPopupType(type);
         setPopupVisible(true);
-        // Masque le popup après 5 secondes, sauf si c'est pour une vue détaillée
-        if (type !== "view_detail") { 
+        if (type !== "view_detail") {
             setTimeout(() => setPopupVisible(false), 5000);
         }
     };
@@ -76,14 +92,15 @@ export default function ContributionScreen() {
     const resetForm = () => {
         setAmount("");
         setDescription("");
-        setContributionDate(getTodayDate()); 
-        setMonth("JANUARY"); // ✅ Réinitialisation du mois
+        setContributionDate(getTodayDate());
+        setMonth("JANUARY");
+        // ❌ Suppression de la réinitialisation de latePenaltyAmount
+        setStatus(CONTRIBUTION_STATUSES[0].value);
         setEditingContributionId(null);
-        // Initialise selectedMemberId au premier membre s'il existe
         if (members.length > 0 && !selectedMemberId) {
-            setSelectedMemberId(members[0].id); 
+            setSelectedMemberId(members[0].id);
         } else if (members.length === 0) {
-             setSelectedMemberId(""); // Réinitialise si aucun membre n'est chargé
+             setSelectedMemberId("");
         }
     };
 
@@ -97,7 +114,6 @@ export default function ContributionScreen() {
             }));
             setMembers(membersData);
 
-            // S'assurer que l'ID du membre est sélectionné après chargement des membres
             if (membersData.length > 0 && !selectedMemberId) {
                 setSelectedMemberId(membersData[0].id);
             }
@@ -110,7 +126,7 @@ export default function ContributionScreen() {
         } finally {
             setLoadingData(false);
         }
-    }, [selectedMemberId]); // Ajouté selectedMemberId pour la logique d'initialisation
+    }, [selectedMemberId]);
 
     useEffect(() => {
         loadData();
@@ -118,20 +134,25 @@ export default function ContributionScreen() {
 
     const saveContribution = async () => {
         // Validation avant soumission
-        if (!selectedMemberId || !amount || !description.trim()) {
-            return showPopup("Veuillez remplir le membre, le montant et la description.", "error");
+        if (!selectedMemberId || !amount || !month || !status) {
+             return showPopup("Veuillez remplir le membre, le montant, le mois et le type de contribution.", "error");
         }
+
         const parsedAmount = parseFloat(amount);
         if (isNaN(parsedAmount) || parsedAmount <= 0) {
             return showPopup("Le montant doit être un nombre positif.", "error");
         }
+        
+        // ❌ Suppression de la validation de la pénalité
 
         const payload = {
             amount: parsedAmount,
-            description: description.trim(),
+            description: description.trim() || null,
             memberId: parseInt(selectedMemberId),
             contributionDate: contributionDate,
-            month: month, // ✅ Ajout du champ month
+            month: month,
+            // ❌ Suppression de latePenaltyAmount du payload
+            status: status,
         };
 
         setIsSubmitting(true);
@@ -146,7 +167,7 @@ export default function ContributionScreen() {
             }
             setModalVisible(false);
             resetForm();
-            loadData(); 
+            loadData();
         } catch (error) {
             console.error("Erreur d'enregistrement:", error);
             showPopup(getBackendErrorMessage(error), "error");
@@ -159,8 +180,9 @@ export default function ContributionScreen() {
         setAmount(contribution.amount ? contribution.amount.toString() : "");
         setDescription(contribution.description || "");
         setContributionDate(contribution.contributionDate || getTodayDate());
-        setMonth(contribution.month || "JANUARY"); // ✅ Affichage du mois
-        // S'assurer que l'ID du membre est une chaîne de caractères
+        setMonth(contribution.month || "JANUARY");
+        // ❌ Suppression de l'affichage de la pénalité
+        setStatus(contribution.status || CONTRIBUTION_STATUSES[0].value);
         setSelectedMemberId(contribution.member?.id?.toString() || contribution.memberId?.toString() || "");
         setEditingContributionId(contribution.id);
         setModalVisible(true);
@@ -174,8 +196,8 @@ export default function ContributionScreen() {
     const performDeleteContribution = async () => {
         if (!contributionToDelete) return;
         const contributionId = contributionToDelete.id;
-        const memberName = contributionToDelete.member 
-            ? `${contributionToDelete.member.firstname} ${contributionToDelete.member.lastname}` 
+        const memberName = contributionToDelete.member
+            ? `${contributionToDelete.member.firstname} ${contributionToDelete.member.lastname}`
             : `ID ${contributionId}`;
         try {
             await axios.delete(`${CONTRIBUTIONS_API}/${contributionId}`);
@@ -191,23 +213,25 @@ export default function ContributionScreen() {
     };
 
     const viewContribution = (item) => {
-        const memberName = item.member 
-            ? `${item.member.firstname} ${item.member.lastname}` 
+        const memberName = item.member
+            ? `${item.member.firstname} ${item.member.lastname}`
             : `ID ${item.memberId}`;
-        // Utiliser un affichage plus propre ou simplement un popup standard
-        const detailMessage = 
-            `💰 Montant: ${item.amount ? item.amount.toLocaleString('fr-FR') : 'N/A'} FBu\n` +
-            `👤 Membre: ${memberName}\n` +
+
+        // ❌ Suppression de l'affichage conditionnel de la pénalité
+        const detailMessage =
+            `👤 Membre: **${memberName}**\n` +
+            `💰 Montant: **${item.amount ? item.amount.toLocaleString('fr-FR') : 'N/A'} FBu**\n` +
+            `🏷️ Type: **${getStatusLabel(item.status)}**\n` +
             `📅 Date: ${item.contributionDate || 'N/A'}\n` +
             `🗓 Mois: ${item.month || 'N/A'}\n` +
             `📝 Description: ${item.description || 'N/A'}`;
-            
-        showPopup(detailMessage, "view_detail"); // Utiliser un type pour ne pas masquer automatiquement
+
+        showPopup(detailMessage, "view_detail");
     };
 
     const ContributionItem = ({ item }) => {
-        const memberName = item.member 
-            ? `${item.member.firstname} ${item.member.lastname}` 
+        const memberName = item.member
+            ? `${item.member.firstname} ${item.member.lastname}`
             : `ID Inconnu (${item.memberId || 'N/A'})`;
         return (
             <View style={styles.tableRow}>
@@ -218,7 +242,7 @@ export default function ContributionScreen() {
                         <MaterialIcons name="info" size={22} color="#004080" />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => editContribution(item)}>
-                        <MaterialIcons name="edit" size={22} color="#FFA500" /> 
+                        <MaterialIcons name="edit" size={22} color="#FFA500" />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => confirmDeleteContribution(item)}>
                         <MaterialIcons name="delete" size={22} color="#FF0000" />
@@ -257,10 +281,10 @@ export default function ContributionScreen() {
             </Modal>
 
             {/* Bouton ajouter */}
-            <TouchableOpacity 
-                style={styles.addButton} 
+            <TouchableOpacity
+                style={styles.addButton}
                 onPress={() => { resetForm(); setSelectedMemberId(members.length > 0 ? members[0].id : ""); setModalVisible(true); }}
-                disabled={members.length === 0 && !loadingData} // Désactiver si on charge ou s'il n'y a pas de membres
+                disabled={members.length === 0 && !loadingData}
             >
                 <Text style={styles.addButtonText}>➕ Ajouter une contribution</Text>
             </TouchableOpacity>
@@ -274,7 +298,7 @@ export default function ContributionScreen() {
                         </Text>
                         <ScrollView>
                             {/* Membre */}
-                            <Text style={styles.label}>Membre</Text>
+                            <Text style={styles.label}>Membre *</Text>
                             <View style={styles.pickerContainer}>
                                 {loadingData && members.length === 0 ? (
                                     <ActivityIndicator size="small" color="#004080" style={{height: 40}} />
@@ -286,10 +310,10 @@ export default function ContributionScreen() {
                                         enabled={!isSubmitting}
                                     >
                                         {members.map((member) => (
-                                            <Picker.Item 
-                                                key={member.id} 
-                                                label={member.name} 
-                                                value={member.id}  
+                                            <Picker.Item
+                                                key={member.id}
+                                                label={member.name}
+                                                value={member.id}
                                             />
                                         ))}
                                     </Picker>
@@ -299,7 +323,7 @@ export default function ContributionScreen() {
                             </View>
 
                             {/* Montant */}
-                            <Text style={styles.label}>Montant (FBu)</Text>
+                            <Text style={styles.label}>Montant (FBu) *</Text>
                             <TextInput
                                 style={styles.input}
                                 placeholder="Ex: 48000"
@@ -313,14 +337,14 @@ export default function ContributionScreen() {
                             <Text style={styles.label}>Description</Text>
                             <TextInput
                                 style={styles.input}
-                                placeholder="Contribution Octobre"
+                                placeholder="Description de la transaction (facultatif)"
                                 value={description}
                                 onChangeText={setDescription}
                                 editable={!isSubmitting}
                             />
 
                             {/* Mois */}
-                            <Text style={styles.label}>Mois</Text>
+                            <Text style={styles.label}>Mois *</Text>
                             <View style={styles.pickerContainer}>
                                 <Picker
                                     selectedValue={month}
@@ -328,23 +352,31 @@ export default function ContributionScreen() {
                                     style={styles.picker}
                                     enabled={!isSubmitting}
                                 >
-                                    <Picker.Item label="JANUARY" value="JANUARY" />
-                                    <Picker.Item label="FEBRUARY" value="FEBRUARY" />
-                                    <Picker.Item label="MARCH" value="MARCH" />
-                                    <Picker.Item label="APRIL" value="APRIL" />
-                                    <Picker.Item label="MAY" value="MAY" />
-                                    <Picker.Item label="JUNE" value="JUNE" />
-                                    <Picker.Item label="JULY" value="JULY" />
-                                    <Picker.Item label="AUGUST" value="AUGUST" />
-                                    <Picker.Item label="SEPTEMBER" value="SEPTEMBER" />
-                                    <Picker.Item label="OCTOBER" value="OCTOBER" />
-                                    <Picker.Item label="NOVEMBER" value="NOVEMBER" />
-                                    <Picker.Item label="DECEMBER" value="DECEMBER" />
+                                    {["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"].map(m => (
+                                        <Picker.Item key={m} label={m} value={m} />
+                                    ))}
                                 </Picker>
                             </View>
 
+                            {/* Type de Contribution (Status) */}
+                            <Text style={styles.label}>Type de Contribution *</Text>
+                            <View style={styles.pickerContainer}>
+                                <Picker
+                                    selectedValue={status}
+                                    onValueChange={(value) => setStatus(value)}
+                                    style={styles.picker}
+                                    enabled={!isSubmitting}
+                                >
+                                    {CONTRIBUTION_STATUSES.map((s) => (
+                                        <Picker.Item key={s.value} label={s.label} value={s.value} />
+                                    ))}
+                                </Picker>
+                            </View>
+
+                            {/* ❌ Suppression du champ Pénalité de retard */}
+
                             {/* Date */}
-                            <Text style={styles.label}>Date (YYYY-MM-DD)</Text>
+                            <Text style={styles.label}>Date (YYYY-MM-DD) *</Text>
                             <TextInput
                                 style={styles.input}
                                 placeholder="AAAA-MM-JJ"
@@ -355,8 +387,8 @@ export default function ContributionScreen() {
 
                             {/* Boutons */}
                             <View style={styles.modalButtons}>
-                                <TouchableOpacity 
-                                    style={styles.saveButton} 
+                                <TouchableOpacity
+                                    style={styles.saveButton}
                                     onPress={saveContribution}
                                     disabled={isSubmitting || members.length === 0}
                                 >
@@ -409,8 +441,8 @@ export default function ContributionScreen() {
                 <View style={styles.popupOverlay}>
                     <View style={[
                         styles.popupBox,
-                        popupType === "error" ? styles.popupError : 
-                        popupType === "view_detail" ? { backgroundColor: "#fff", borderTopColor: "#004080", borderTopWidth: 6 } : 
+                        popupType === "error" ? styles.popupError :
+                        popupType === "view_detail" ? { backgroundColor: "#fff", borderTopColor: "#004080", borderTopWidth: 6 } :
                         styles.popupSuccess,
                     ]}>
                         <Text style={styles.popupText}>{popupMessage}</Text>
@@ -449,13 +481,13 @@ const styles = StyleSheet.create({
     cellText: { fontSize: 14, color: "#333", textAlign: 'center' },
     cellActions: { flexDirection: "row", justifyContent: "space-around" },
     emptyText: { textAlign: "center", color: "#555", marginTop: 30, fontStyle: "italic" },
-    popupOverlay: { 
-        flex: 1, 
-        justifyContent: "center", 
-        alignItems: "center", 
+    popupOverlay: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
         backgroundColor: "rgba(0,0,0,0.4)",
-        zIndex: 9999,    
-        elevation: 10,     
+        zIndex: 9999,
+        elevation: 10,
     },
     popupBox: { width: "80%", padding: 20, borderRadius: 10, alignItems: "center" },
     popupSuccess: { backgroundColor: "#E0FBE2", borderTopWidth: 6, borderTopColor: "#00C851" },
