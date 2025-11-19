@@ -19,9 +19,10 @@ const chartConfig = {
 };
 
 const CURRENT_BALANCE_COLOR = '#1E90FF'; // Bleu Vif
-const LOAN_BALANCE_COLOR = '#FF6347';      // Rouge Corail
+const LOAN_BALANCE_COLOR = '#FF6347';     // Rouge Corail
 
-const BACKGROUND_IMAGE_URI = 'https://i.imgur.com/gK9lYpS.png'; 
+// Import de l'image locale depuis les assets
+const BACKGROUND_IMAGE = require('../assets/yeah.jpg'); // Ajustez le chemin selon votre structure de dossiers
 
 // Composant pour le graphique (maintenant un Pie Chart)
 const BalancePieChart = ({ currentBalance, loanBalance }) => {
@@ -41,8 +42,6 @@ const BalancePieChart = ({ currentBalance, loanBalance }) => {
     
     const data = [
       {
-        // CORRECTION: Utilisation de guillemets droits simples ou doubles pour une chaîne vide
-        // Ceci garantit qu'il n'y a pas de problème de parsing de caractère.
         name: "", 
         population: currentBalance, 
         color: CURRENT_BALANCE_COLOR,
@@ -91,11 +90,9 @@ export default function DashboardScreen() {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // CORRECTION DE L'URL: Assurez-vous que l'URL locale est accessible.
-  // L'utilisation d'une adresse IP privée comme 192.168.x.x est courante en développement,
-  // mais une URL non atteignable peut générer une erreur fatale dans certains environnements.
   const API_URL = "https://ziganya.onrender.com/ziganya-managment-system/api/v1/reports";
   // const API_URL = "http://localhost:8001/ziganya-managment-system/api/v1/reports";
+  
 
   useEffect(() => {
     const fetchReport = async () => {
@@ -103,7 +100,6 @@ export default function DashboardScreen() {
         const response = await axios.get(API_URL);
         setReport(response.data);
       } catch (error) {
-        // Loggez l'erreur de manière plus sécurisée, sans exposer tout l'objet d'erreur
         console.error("Erreur lors du chargement du rapport. Vérifiez l'URL et l'état du serveur.", error.message);
       } finally {
         setLoading(false);
@@ -131,12 +127,10 @@ export default function DashboardScreen() {
   
   // Formatage des valeurs
   const formatValue = (value) => {
-    // Ajout d'une vérification de type pour éviter des erreurs potentielles de toLocaleString
     return typeof value === 'number' ? value.toLocaleString('fr-FR') : '0';
   };
   
   const formatCurrency = (value) => {
-    // Ajout d'une vérification de type pour toFixed
     if (typeof value === 'number') {
         return `${value.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, " ")} FBu`;
     }
@@ -149,11 +143,12 @@ export default function DashboardScreen() {
         {/* Entête et fond de l'image (pleine largeur) */}
         <View style={styles.headerContainer}>
             <ImageBackground
-              source={{ uri: BACKGROUND_IMAGE_URI }}
+              source={BACKGROUND_IMAGE}
               style={styles.imageBackground}
               imageStyle={styles.imageStyle}
             >
-                <View style={styles.overlay} /> 
+                {/* SUPPRIMÉ: La couche overlay bleue qui obscurcissait l'image */}
+                {/* <View style={styles.overlay} /> */}
 
                 <Text style={styles.mainTitle}>
                     <Text style={{fontWeight: '900'}}>ZIGANYA</Text>{"\n"}
@@ -240,16 +235,19 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0058A8',
+    // SUPPRIMÉ: Le fond bleu de secours
+    // backgroundColor: '#0058A8',
   },
   imageStyle: {
-    opacity: 0.3,
+    // MODIFIÉ: Opacity augmentée pour mieux voir l'image
+    opacity: 0.8, // Augmenté de 0.3 à 0.8 pour plus de visibilité
     resizeMode: 'cover',
   },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 88, 168, 0.7)',
-  },
+  // SUPPRIMÉ: La couche overlay bleue
+  // overlay: {
+  //   ...StyleSheet.absoluteFillObject,
+  //   backgroundColor: 'rgba(0, 88, 168, 0.7)',
+  // },
   mainTitle: {
     fontSize: 20,
     fontWeight: 'bold',
@@ -257,23 +255,26 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 5,
     letterSpacing: 1,
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowColor: 'rgba(0, 0, 0, 0.8)', // Ombre plus prononcée pour meilleure lisibilité
     textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
+    textShadowRadius: 3,
   },
   messageBox: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)', // Légèrement plus transparent
     paddingVertical: 5,
     paddingHorizontal: 15,
     borderRadius: 5,
     marginTop: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
+    borderColor: 'rgba(255, 255, 255, 0.5)',
   },
   messageText: {
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '500',
+    textShadowColor: 'rgba(0, 0, 0, 0.5)', // Ajout d'ombre pour meilleure lisibilité
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
 
   /* Styles des cartes de données */
@@ -288,7 +289,7 @@ const styles = StyleSheet.create({
   },
   gridItem: {
     flex: 1,
-    marginHorizontal: 5, // Ajout de petites marges entre les cartes
+    marginHorizontal: 5,
     paddingVertical: 15,
     paddingHorizontal: 10,
     borderRadius: 10,
