@@ -9,11 +9,11 @@ const API_BASE_URL = "https://ziganya.onrender.com/ziganya-managment-system/api/
 // const API_BASE_URL = "http://localhost:8001/ziganya-managment-system/api/v1";
 
 const ALL_MEMBERS_REPORT_API = `${API_BASE_URL}/reports/all-members`;
-const GENERAL_REPORT_API = `${API_BASE_URL}/reports/general`; // 👈 Nouvelle API pour le rapport général
+const GENERAL_REPORT_API = `${API_BASE_URL}/reports/general`;
 
 // --- Composant Principal (Gestion des Onglets) ---
 export default function App() {
-    const [activeTab, setActiveTab] = useState('members'); // 'members' ou 'general'
+    const [activeTab, setActiveTab] = useState('members');
 
     return (
         <View style={styles.container}>
@@ -49,7 +49,7 @@ export default function App() {
 }
 
 // ------------------------------------------
-// Composant du Rapport des Membres (Ancien App)
+// Composant du Rapport des Membres (Version Tableau)
 // ------------------------------------------
 function MembersReport() {
     const [members, setMembers] = useState([]);
@@ -152,41 +152,79 @@ function MembersReport() {
                 <ActivityIndicator size="large" color="#007BFF" style={reportStyles.loadingIndicator} />
             ) : (
                 <>
-                    <ScrollView style={reportStyles.scroll}>
-                        {members.map((item, index) => (
-                            <View key={index} style={reportStyles.card}>
-                                <Text style={reportStyles.name}>
-                                    {item.memberResponse.firstname} {item.memberResponse.lastname}
-                                </Text>
-                                <Text style={reportStyles.phone}>{item.memberResponse.phoneNumber}</Text>
+                    {/* En-tête du tableau */}
+                    <View style={reportStyles.tableHeader}>
+                        <Text style={[reportStyles.headerCell, reportStyles.nameHeader]}>Membre</Text>
+                        <Text style={[reportStyles.headerCell, reportStyles.phoneHeader]}>Téléphone</Text>
+                        <Text style={[reportStyles.headerCell, reportStyles.actionsHeader]}>Actions</Text>
+                        <Text style={[reportStyles.headerCell, reportStyles.amountHeader]}>Contribution</Text>
+                        <Text style={[reportStyles.headerCell, reportStyles.amountHeader]}>Prêt</Text>
+                        <Text style={[reportStyles.headerCell, reportStyles.amountHeader]}>Remboursement</Text>
+                        <Text style={[reportStyles.headerCell, reportStyles.amountHeader]}>Intérêt</Text>
+                        <Text style={[reportStyles.headerCell, reportStyles.totalHeader]}>Total</Text>
+                    </View>
 
-                                <View style={reportStyles.row}>
-                                    <Text style={reportStyles.label}>Actions</Text>
-                                    <Text style={reportStyles.value}>{formatAmount(item.actions)}</Text>
+                    {/* Corps du tableau avec ScrollView */}
+                    <ScrollView style={reportStyles.tableBody} showsVerticalScrollIndicator={true}>
+                        {members.map((item, index) => (
+                            <View key={index} style={[
+                                reportStyles.tableRow,
+                                index % 2 === 0 ? reportStyles.evenRow : reportStyles.oddRow
+                            ]}>
+                                {/* Colonne Nom */}
+                                <View style={[reportStyles.tableCell, reportStyles.nameCell]}>
+                                    <Text style={reportStyles.nameText} numberOfLines={2}>
+                                        {item.memberResponse.firstname} {item.memberResponse.lastname}
+                                    </Text>
                                 </View>
-                                <View style={reportStyles.row}>
-                                    <Text style={reportStyles.label}>Contribution</Text>
-                                    <Text style={reportStyles.value}>{formatAmount(item.contributedAmount)} FBu</Text>
+
+                                {/* Colonne Téléphone */}
+                                <View style={[reportStyles.tableCell, reportStyles.phoneCell]}>
+                                    <Text style={reportStyles.phoneText}>{item.memberResponse.phoneNumber}</Text>
                                 </View>
-                                <View style={reportStyles.row}>
-                                    <Text style={reportStyles.label}>Prêt</Text>
-                                    <Text style={reportStyles.value}>{formatAmount(item.loanAmount)} FBu</Text>
+
+                                {/* Colonne Actions */}
+                                <View style={[reportStyles.tableCell, reportStyles.actionsCell]}>
+                                    <Text style={reportStyles.actionsText}>{formatAmount(item.actions)}</Text>
                                 </View>
-                                <View style={reportStyles.row}>
-                                    <Text style={reportStyles.label}>Remboursement</Text>
-                                    <Text style={reportStyles.value}>{formatAmount(item.refundAmount)} FBu</Text>
+
+                                {/* Colonne Contribution */}
+                                <View style={[reportStyles.tableCell, reportStyles.amountCell]}>
+                                    <Text style={reportStyles.amountText}>{formatAmount(item.contributedAmount)}</Text>
                                 </View>
-                                <View style={reportStyles.row}>
-                                    <Text style={reportStyles.label}>Intérêt</Text>
-                                    <Text style={reportStyles.value}>{formatAmount(item.interestAmount)} FBu</Text>
+
+                                {/* Colonne Prêt */}
+                                <View style={[reportStyles.tableCell, reportStyles.amountCell]}>
+                                    <Text style={reportStyles.amountText}>{formatAmount(item.loanAmount)}</Text>
                                 </View>
-                                <View style={[reportStyles.row, reportStyles.totalRow]}>
-                                    <Text style={[reportStyles.label, reportStyles.totalLabel]}>Total</Text>
-                                    <Text style={[reportStyles.value, reportStyles.totalValue]}>{formatAmount(item.totalAmount)} FBu</Text>
+
+                                {/* Colonne Remboursement */}
+                                <View style={[reportStyles.tableCell, reportStyles.amountCell]}>
+                                    <Text style={reportStyles.amountText}>{formatAmount(item.refundAmount)}</Text>
+                                </View>
+
+                                {/* Colonne Intérêt */}
+                                <View style={[reportStyles.tableCell, reportStyles.amountCell]}>
+                                    <Text style={reportStyles.amountText}>{formatAmount(item.interestAmount)}</Text>
+                                </View>
+
+                                {/* Colonne Total */}
+                                <View style={[reportStyles.tableCell, reportStyles.totalCell]}>
+                                    <Text style={reportStyles.totalText}>{formatAmount(item.totalAmount)}</Text>
                                 </View>
                             </View>
                         ))}
                     </ScrollView>
+
+                    {/* Résumé en bas du tableau */}
+                    <View style={reportStyles.tableFooter}>
+                        <Text style={reportStyles.footerText}>
+                            Total des membres: {members.length}
+                        </Text>
+                        <Text style={reportStyles.footerText}>
+                            Total général: {formatAmount(members.reduce((sum, item) => sum + (item.totalAmount || 0), 0))} FBu
+                        </Text>
+                    </View>
 
                     <View style={reportStyles.buttonContainer}>
                         <Button title="Générer le PDF" onPress={generatePDF} color="#007BFF" disabled={loading || members.length === 0} />
@@ -198,7 +236,7 @@ function MembersReport() {
 }
 
 // ------------------------------------------
-// Composant du Rapport Général (Nouveau)
+// Composant du Rapport Général (inchangé)
 // ------------------------------------------
 function GeneralReport() {
     const [report, setReport] = useState(null);
@@ -226,7 +264,6 @@ function GeneralReport() {
         return amount ? amount.toLocaleString('fr-FR') : '0';
     };
     
-    // Ajout d'une fonction pour générer le PDF du rapport général
     const generateGeneralPDF = async () => {
         if (!report) {
             return Alert.alert("Information", "Aucune donnée de rapport général à imprimer.");
@@ -291,7 +328,6 @@ function GeneralReport() {
         }
     };
 
-
     return (
         <View style={reportStyles.reportContainer}>
             <Text style={reportStyles.dateText}>Généré le : {new Date().toLocaleDateString()}</Text>
@@ -300,7 +336,6 @@ function GeneralReport() {
             ) : report ? (
                 <ScrollView contentContainerStyle={reportStyles.scrollContent}>
                     <View style={reportStyles.generalCard}>
-                        {/* Nombre total de Membres */}
                         <View style={reportStyles.generalRow}>
                             <Text style={reportStyles.generalLabel}>Nombre de Membres</Text>
                             <Text style={reportStyles.generalValueImportant}>{report.manyofMembers}</Text>
@@ -308,31 +343,26 @@ function GeneralReport() {
                         
                         <View style={reportStyles.generalDivider} />
 
-                        {/* Total des Actions */}
                         <View style={reportStyles.generalRow}>
                             <Text style={reportStyles.generalLabel}>Total des Actions</Text>
                             <Text style={reportStyles.generalValue}>{formatAmount(report.actions)}</Text>
                         </View>
 
-                        {/* Montant total Contribué */}
                         <View style={reportStyles.generalRow}>
                             <Text style={reportStyles.generalLabel}>Total Contribué (FBu)</Text>
                             <Text style={reportStyles.generalValue}>{formatAmount(report.contributedAmount)} FBu</Text>
                         </View>
 
-                        {/* Montant total des Prêts (Credited) */}
                         <View style={reportStyles.generalRow}>
                             <Text style={reportStyles.generalLabel}>Total des Prêts (FBu)</Text>
                             <Text style={reportStyles.generalValue}>{formatAmount(report.creditedAmount)} FBu</Text>
                         </View>
 
-                        {/* Montant total des Intérêts */}
                         <View style={reportStyles.generalRow}>
                             <Text style={reportStyles.generalLabel}>Total Intérêts (FBu)</Text>
                             <Text style={reportStyles.generalValue}>{formatAmount(report.interestAmount)} FBu</Text>
                         </View>
 
-                        {/* Pénalités de Contribution */}
                         <View style={reportStyles.generalRow}>
                             <Text style={reportStyles.generalLabel}>Pénalités de Contribution (FBu)</Text>
                             <Text style={reportStyles.generalValue}>{formatAmount(report.contributionLatePenalityAmount)} FBu</Text>
@@ -362,7 +392,7 @@ function GeneralReport() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        paddingTop: 40, // Pour gérer la barre de statut
+        paddingTop: 40,
         backgroundColor: "#f9f9f9",
     },
     header: {
@@ -414,64 +444,107 @@ const reportStyles = StyleSheet.create({
     loadingIndicator: {
         marginTop: 50,
     },
-    scroll: {
+    
+    // Styles pour le tableau des membres
+    tableHeader: {
+        flexDirection: 'row',
+        backgroundColor: '#007BFF',
+        paddingVertical: 12,
+        paddingHorizontal: 5,
+        borderTopLeftRadius: 8,
+        borderTopRightRadius: 8,
+    },
+    headerCell: {
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 12,
+        textAlign: 'center',
+    },
+    nameHeader: { flex: 1.5 },
+    phoneHeader: { flex: 1.2 },
+    actionsHeader: { flex: 0.8 },
+    amountHeader: { flex: 1 },
+    totalHeader: { flex: 1 },
+    
+    tableBody: {
+        flex: 1,
         marginBottom: 10,
     },
-    // Styles pour les cartes Membres
-    card: {
-        backgroundColor: "#fff",
-        borderRadius: 12,
-        padding: 15,
+    tableRow: {
+        flexDirection: 'row',
+        paddingVertical: 8,
+        paddingHorizontal: 5,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
+        minHeight: 50,
+    },
+    evenRow: {
+        backgroundColor: '#fff',
+    },
+    oddRow: {
+        backgroundColor: '#f8f9fa',
+    },
+    tableCell: {
+        justifyContent: 'center',
+        paddingHorizontal: 2,
+    },
+    nameCell: { flex: 1.5 },
+    phoneCell: { flex: 1.2 },
+    actionsCell: { flex: 0.8 },
+    amountCell: { flex: 1 },
+    totalCell: { flex: 1 },
+    
+    nameText: {
+        fontSize: 12,
+        fontWeight: '500',
+        color: '#333',
+        textAlign: 'left',
+    },
+    phoneText: {
+        fontSize: 11,
+        color: '#666',
+        textAlign: 'center',
+    },
+    actionsText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#333',
+        textAlign: 'center',
+    },
+    amountText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#333',
+        textAlign: 'center',
+    },
+    totalText: {
+        fontSize: 11,
+        fontWeight: 'bold',
+        color: '#007BFF',
+        textAlign: 'center',
+    },
+    
+    tableFooter: {
+        backgroundColor: '#e6f7ff',
+        padding: 10,
+        borderBottomLeftRadius: 8,
+        borderBottomRightRadius: 8,
         marginBottom: 10,
-        shadowColor: "#000",
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
     },
-    name: {
-        fontWeight: "bold",
-        fontSize: 16,
-        color: "#333",
+    footerText: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: '#007BFF',
+        textAlign: 'center',
+        marginVertical: 2,
     },
-    phone: {
-        color: "#555",
-        marginBottom: 8,
-    },
-    row: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        borderBottomWidth: 0.5,
-        borderBottomColor: "#ddd",
-        paddingVertical: 4,
-    },
-    label: {
-        fontSize: 14,
-        color: "#555",
-    },
-    value: {
-        fontSize: 14,
-        fontWeight: "600",
-        color: "#222",
-    },
-    totalRow: {
-        marginTop: 8,
-        borderTopWidth: 1,
-        borderTopColor: "#007BFF",
-        paddingTop: 6,
-    },
-    totalLabel: {
-        fontWeight: "bold",
-        color: "#007BFF",
-    },
-    totalValue: {
-        fontWeight: "bold",
-        color: "#007BFF",
-    },
+    
     buttonContainer: {
         marginBottom: 10,
         paddingHorizontal: 5,
     },
-    // Styles pour le Rapport Général
+
+    // Styles pour le Rapport Général (inchangés)
     generalCard: {
         backgroundColor: "#fff",
         borderRadius: 12,

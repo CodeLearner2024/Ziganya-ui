@@ -62,6 +62,7 @@ const initialSettingsState = {
     timesOfContributionForCredit: 0,
     interestFrequency: "DAILY", // Valeur par défaut
     creditRate: 0,
+    activationAccountAmount: 0, // NOUVEAU CHAMP AJOUTÉ
     id: null, 
     cycleEndDate: null,
 };
@@ -144,6 +145,7 @@ export default function AssociationScreen() {
                 maxOfActions: data.maxOfActions != null ? data.maxOfActions.toString() : '0',
                 timesOfContributionForCredit: data.timesOfContributionForCredit != null ? data.timesOfContributionForCredit.toString() : '0',
                 creditRate: data.creditRate != null ? data.creditRate.toString() : '0',
+                activationAccountAmount: data.activationAccountAmount != null ? data.activationAccountAmount.toString() : '0', // NOUVEAU CHAMP AJOUTÉ
                 // Laissez les non-numériques tels quels
                 cycleStartDate: data.cycleStartDate || initialSettingsState.cycleStartDate,
                 interestFrequency: data.interestFrequency || initialSettingsState.interestFrequency,
@@ -199,6 +201,7 @@ export default function AssociationScreen() {
             // Conversion et Validation
             const numContributionAmount = parseFloat(settings.contributionAmount);
             const numCreditRate = parseFloat(settings.creditRate);
+            const numActivationAccountAmount = parseFloat(settings.activationAccountAmount); // NOUVEAU CHAMP AJOUTÉ
             
             data = {
                 contributionAmount: numContributionAmount,
@@ -209,6 +212,7 @@ export default function AssociationScreen() {
                 timesOfContributionForCredit: parseInt(settings.timesOfContributionForCredit, 10),
                 interestFrequency: settings.interestFrequency,
                 creditRate: numCreditRate,
+                activationAccountAmount: numActivationAccountAmount, // NOUVEAU CHAMP AJOUTÉ
                 id: settings.id,
             };
             successMessage = "Paramètres de l'association mis à jour avec succès.";
@@ -218,6 +222,7 @@ export default function AssociationScreen() {
             // Validation
             if (isNaN(numContributionAmount) || numContributionAmount <= 0 || 
                 isNaN(numCreditRate) || numCreditRate < 0 ||
+                isNaN(numActivationAccountAmount) || numActivationAccountAmount < 0 || // NOUVELLE VALIDATION
                 !data.cycleStartDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
                 setIsSubmitting(false);
                 return showPopup("Veuillez vérifier les valeurs numériques et la date du cycle (YYYY-MM-DD).", "error");
@@ -404,6 +409,17 @@ export default function AssociationScreen() {
                     editable={isSettingsEditing && !isSubmitting}
                     keyboardType="numeric"
                 />
+
+                {/* NOUVEAU CHAMP : Activation Account Amount */}
+                <Text style={styles.label}>Montant d'activation du compte (FBu)</Text>
+                <TextInput
+                    style={[styles.input, isSettingsEditing ? styles.inputActive : styles.inputDisabled]}
+                    value={settings.activationAccountAmount}
+                    onChangeText={(text) => setSettings({ ...settings, activationAccountAmount: text })}
+                    editable={isSettingsEditing && !isSubmitting}
+                    keyboardType="numeric"
+                    placeholder="Ex: 50000"
+                />
                 
                 {/* Interest Frequency (Picker) */}
                 <Text style={styles.label}>Fréquence de calcul des intérêts</Text>
@@ -419,7 +435,7 @@ export default function AssociationScreen() {
                             <Picker.Item 
                                 key={option.value} 
                                 label={option.label} 
-                                value={option.value}  
+                                value={option.value} 
                             />
                         ))}
                     </Picker>
