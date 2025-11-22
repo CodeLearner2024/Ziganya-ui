@@ -32,7 +32,7 @@ const translations = {
         selectLanguage: "Change language"
     },
     kdi: {
-        appsPrincipales: "Apps ya Mukini",
+        appsPrincipales: "Ibihakorerwa",
         dashboard: "Incamake",
         members: "Abanywanyi",
         contribution: "Intererano",
