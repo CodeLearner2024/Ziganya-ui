@@ -139,14 +139,13 @@ export default function MenuScreen() {
 
     // Sauvegarder la langue dans le stockage local si nécessaire
     useEffect(() => {
-        // Ici vous pouvez charger la langue sauvegardée depuis AsyncStorage
-        // async function loadLanguage() {
-        //     const savedLanguage = await AsyncStorage.getItem('appLanguage');
-        //     if (savedLanguage) {
-        //         setCurrentLanguage(savedLanguage);
-        //     }
-        // }
-        // loadLanguage();
+        async function loadLanguage() {
+            const savedLanguage = await AsyncStorage.getItem('appLanguage');
+            if (savedLanguage) {
+                setCurrentLanguage(savedLanguage);
+            }
+        }
+        loadLanguage();
     }, []);
 
     const handleLanguageChange = async (languageCode) => {
@@ -166,20 +165,20 @@ export default function MenuScreen() {
 
     return (
         <View style={styles.container}>
-            {/* Header avec titre et sélecteur de langue */}
+            {/* Header avec sélecteur de langue en haut à droite */}
             <View style={styles.header}>
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>
-                        {translations[currentLanguage]?.appsPrincipales || "Apps Principales"}
-                    </Text>
-                    <MaterialIcons name="keyboard-arrow-up" size={24} color={PRIMARY_COLOR} />
-                </View>
-                
-                {/* Sélecteur de langue */}
                 <LanguageSelector 
                     currentLanguage={currentLanguage}
                     onLanguageChange={handleLanguageChange}
                 />
+            </View>
+
+            {/* Section Apps Principales */}
+            <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>
+                    {translations[currentLanguage]?.appsPrincipales || "Apps Principales"}
+                </Text>
+                <MaterialIcons name="keyboard-arrow-up" size={24} color={PRIMARY_COLOR} />
             </View>
 
             {/* Grille des icônes du menu */}
@@ -204,16 +203,19 @@ const styles = StyleSheet.create({
     },
     header: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        justifyContent: 'flex-end',
         alignItems: 'center',
         paddingHorizontal: 15,
-        paddingVertical: 15,
+        paddingVertical: 10,
         marginTop: 10,
-        zIndex: 100, // ✅ Assure que le header reste au-dessus
+        zIndex: 100,
     },
     sectionHeader: {
         flexDirection: 'row',
         alignItems: 'center',
+        paddingHorizontal: 15,
+        paddingVertical: 15,
+        marginTop: 10,
     },
     sectionTitle: {
         fontSize: 16, 
@@ -224,7 +226,7 @@ const styles = StyleSheet.create({
     // Styles pour le sélecteur de langue
     languageContainer: {
         position: 'relative',
-        zIndex: 1000, // ✅ Z-index élevé pour le conteneur
+        zIndex: 1000,
     },
     languageButton: {
         flexDirection: 'row',
@@ -237,7 +239,7 @@ const styles = StyleSheet.create({
         borderColor: PRIMARY_COLOR,
         minWidth: 60,
         justifyContent: 'space-between',
-        zIndex: 1001, // ✅ Z-index plus élevé pour le bouton
+        zIndex: 1001,
     },
     languageButtonText: {
         fontSize: 12,
@@ -255,11 +257,11 @@ const styles = StyleSheet.create({
         borderColor: '#ddd',
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2, // ✅ Ombre plus visible
+        shadowOpacity: 0.2,
         shadowRadius: 6,
-        elevation: 10, // ✅ Élévation plus importante pour Android
+        elevation: 10,
         minWidth: 120,
-        zIndex: 1002, // ✅ Z-index le plus élevé pour le dropdown
+        zIndex: 1002,
     },
     languageOption: {
         paddingHorizontal: 12,
@@ -278,15 +280,14 @@ const styles = StyleSheet.create({
         color: PRIMARY_COLOR,
         fontWeight: 'bold',
     },
-    // ✅ Overlay pour fermer le dropdown
     overlay: {
         position: 'absolute',
-        top: -100, // Étendre vers le haut
-        left: -100, // Étendre vers la gauche
-        right: -100, // Étendre vers la droite
-        bottom: -100, // Étendre vers le bas
+        top: -100,
+        left: -100,
+        right: -100,
+        bottom: -100,
         backgroundColor: 'transparent',
-        zIndex: 999, // ✅ En dessous du dropdown mais au-dessus du reste
+        zIndex: 999,
     },
     menuGrid: {
         justifyContent: 'flex-start', 
@@ -294,7 +295,7 @@ const styles = StyleSheet.create({
         paddingBottom: 20,
     },
     flatList: {
-        zIndex: 1, // ✅ Z-index bas pour la FlatList
+        zIndex: 1,
     },
     menuItem: {
         backgroundColor: "#fff", 
@@ -309,7 +310,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.08,
         shadowRadius: 2,
         elevation: 3,
-        zIndex: 1, // ✅ Z-index bas pour les items du menu
+        zIndex: 1,
     },
     menuItemText: {
         fontSize: 9,

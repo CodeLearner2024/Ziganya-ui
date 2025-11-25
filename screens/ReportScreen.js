@@ -1,8 +1,185 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { View, ScrollView, StyleSheet, Text, Button, ActivityIndicator, Alert, TouchableOpacity } from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import { MaterialIcons } from "@expo/vector-icons";
 import axios from "axios";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
+
+// --- CONSTANTES ---
+const PRIMARY_COLOR = "#4C1C8A";
+
+// --- TRADUCTIONS MULTILINGUES ---
+const translations = {
+  fr: {
+    reports: "Rapports du Système",
+    membersReport: "Rapport Membres",
+    generalReport: "Rapport Général",
+    lastUpdate: "Date de la dernière mise à jour",
+    generatedOn: "Généré le",
+    member: "Membre",
+    phone: "Téléphone",
+    actions: "Actions",
+    contribution: "Contribution",
+    loan: "Prêt",
+    refund: "Remboursement",
+    interest: "Intérêt",
+    total: "Total",
+    totalMembers: "Total des membres",
+    totalGeneral: "Total général",
+    generatePDF: "Générer le PDF",
+    noData: "Aucune donnée à imprimer.",
+    error: "Erreur",
+    connectionError: "Impossible de récupérer les données.",
+    pdfError: "Échec de la génération du PDF.",
+    generalReportData: {
+      totalMembers: "Nombre total de Membres",
+      totalActions: "Total des Actions",
+      totalContributed: "Montant total Contribué",
+      totalLoans: "Montant total des Prêts",
+      totalInterests: "Montant total des Intérêts",
+      contributionPenalties: "Pénalités de Contribution"
+    },
+    messages: {
+      loading: "Chargement...",
+      noData: "Aucune donnée disponible",
+      connectionError: "Erreur de connexion"
+    }
+  },
+  en: {
+    reports: "System Reports",
+    membersReport: "Members Report",
+    generalReport: "General Report",
+    lastUpdate: "Last update date",
+    generatedOn: "Generated on",
+    member: "Member",
+    phone: "Phone",
+    actions: "Shares",
+    contribution: "Contribution",
+    loan: "Loan",
+    refund: "Refund",
+    interest: "Interest",
+    total: "Total",
+    totalMembers: "Total members",
+    totalGeneral: "Total general",
+    generatePDF: "Generate PDF",
+    noData: "No data to print.",
+    error: "Error",
+    connectionError: "Unable to retrieve data.",
+    pdfError: "PDF generation failed.",
+    generalReportData: {
+      totalMembers: "Total Number of Members",
+      totalActions: "Total Shares",
+      totalContributed: "Total Contributed Amount",
+      totalLoans: "Total Loan Amount",
+      totalInterests: "Total Interest Amount",
+      contributionPenalties: "Contribution Penalties"
+    },
+    messages: {
+      loading: "Loading...",
+      noData: "No data available",
+      connectionError: "Connection error"
+    }
+  },
+  kdi: {
+    reports: "Raporo Z'Ubucukumbuzi",
+    membersReport: "Raporo Y'abanyamuryango",
+    generalReport: "Raporo Nshinganwa",
+    lastUpdate: "Itariki Yo Gusubiramo",
+    generatedOn: "Yakozwe Ku",
+    member: "Umunyamuryango",
+    phone: "Amaguru",
+    actions: "Ingingo",
+    contribution: "Inkunga",
+    loan: "Inguzanyo",
+    refund: "Kwishura",
+    interest: "Inyongera",
+    total: "Igiteranyo",
+    totalMembers: "Abanyamuryango Bose",
+    totalGeneral: "Igiteranyo Cyose",
+    generatePDF: "Kora PDF",
+    noData: "Nta Makuru Yo Gucapwa.",
+    error: "Ikosa",
+    connectionError: "Ntishoboka Kubona Amakuru.",
+    pdfError: "Gukora PDF Byanze.",
+    generalReportData: {
+      totalMembers: "Umubare W'abanyamuryango Bose",
+      totalActions: "Ingingo Zose",
+      totalContributed: "Amafaranga Yose Yatanzwe",
+      totalLoans: "Amafaranga Y'inguzanyo Zose",
+      totalInterests: "Amafaranga Y'inyongera Yose",
+      contributionPenalties: "Amafaranga Yo Kuriha Inkunga"
+    },
+    messages: {
+      loading: "Kurondera...",
+      noData: "Nta Makuru Ahari",
+      connectionError: "Ikosa Ry'ubwumvikane"
+    }
+  }
+};
+
+// --- COMPOSANT SÉLECTEUR DE LANGUE ---
+const LanguageSelector = ({ currentLanguage, onLanguageChange }) => {
+  const [showSelector, setShowSelector] = useState(false);
+  const languagesList = [
+    { code: 'fr', name: 'FR', fullName: 'Français' },
+    { code: 'en', name: 'EN', fullName: 'English' },
+    { code: 'kdi', name: 'KDI', fullName: 'Kirundi' }
+  ];
+
+  const currentLang = languagesList.find(lang => lang.code === currentLanguage);
+
+  return (
+    <View style={embeddedStyles.languageContainer}>
+      <TouchableOpacity 
+        style={embeddedStyles.languageButton} 
+        onPress={() => setShowSelector(!showSelector)}
+      >
+        <Text style={embeddedStyles.languageButtonText}>
+          {currentLang?.name}
+        </Text>
+        <MaterialIcons 
+          name={showSelector ? "keyboard-arrow-up" : "keyboard-arrow-down"} 
+          size={16} 
+          color={PRIMARY_COLOR} 
+        />
+      </TouchableOpacity>
+      
+      {showSelector && (
+        <View style={embeddedStyles.languageDropdown}>
+          {languagesList.map((lang) => (
+            <TouchableOpacity
+              key={lang.code}
+              style={[
+                embeddedStyles.languageOption,
+                currentLanguage === lang.code && embeddedStyles.languageOptionSelected
+              ]}
+              onPress={() => {
+                onLanguageChange(lang.code);
+                setShowSelector(false);
+              }}
+            >
+              <Text style={[
+                embeddedStyles.languageOptionText,
+                currentLanguage === lang.code && embeddedStyles.languageOptionTextSelected
+              ]}>
+                {lang.fullName}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+      
+      {showSelector && (
+        <TouchableOpacity 
+          style={embeddedStyles.overlay} 
+          onPress={() => setShowSelector(false)} 
+          activeOpacity={1} 
+        />
+      )}
+    </View>
+  );
+};
 
 // --- Configuration API ---
 const API_BASE_URL = "https://ziganya.onrender.com/ziganya-managment-system/api/v1";
@@ -12,36 +189,72 @@ const ALL_MEMBERS_REPORT_API = `${API_BASE_URL}/reports/all-members`;
 const GENERAL_REPORT_API = `${API_BASE_URL}/reports/general`;
 
 // --- Composant Principal (Gestion des Onglets) ---
-export default function App() {
+export default function ReportScreen({ route }) {
+    const navigation = useNavigation();
     const [activeTab, setActiveTab] = useState('members');
+    const [currentLanguage, setCurrentLanguage] = useState(route.params?.currentLanguage || 'fr');
+
+    // Fonction de traduction
+    const t = (key) => {
+        const keys = key.split('.');
+        let result = translations[currentLanguage];
+        keys.forEach(k => {
+            result = result?.[k];
+        });
+        return result ?? key;
+    };
+
+    // Mettre à jour la langue si elle change dans les paramètres de route
+    useEffect(() => {
+        if (route.params?.currentLanguage) {
+            setCurrentLanguage(route.params.currentLanguage);
+        }
+    }, [route.params?.currentLanguage]);
+
+    // Configurer le header avec le sélecteur de langue
+    useEffect(() => {
+        navigation.setOptions({
+            title: t('reports'),
+            headerRight: () => (
+                <View style={headerStyles.headerRight}>
+                    <LanguageSelector 
+                        currentLanguage={currentLanguage} 
+                        onLanguageChange={setCurrentLanguage} 
+                    />
+                </View>
+            )
+        });
+    }, [navigation, t, currentLanguage]);
 
     return (
         <View style={styles.container}>
-            <Text style={styles.header}>Rapports du Système</Text>
-
             {/* Zone des Onglets */}
             <View style={styles.tabContainer}>
                 <TouchableOpacity
                     style={[styles.tabButton, activeTab === 'members' && styles.activeTab]}
                     onPress={() => setActiveTab('members')}
                 >
-                    <Text style={[styles.tabText, activeTab === 'members' && styles.activeTabText]}>Rapport Membres</Text>
+                    <Text style={[styles.tabText, activeTab === 'members' && styles.activeTabText]}>
+                        {t('membersReport')}
+                    </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                     style={[styles.tabButton, activeTab === 'general' && styles.activeTab]}
                     onPress={() => setActiveTab('general')}
                 >
-                    <Text style={[styles.tabText, activeTab === 'general' && styles.activeTabText]}>Rapport Général</Text>
+                    <Text style={[styles.tabText, activeTab === 'general' && styles.activeTabText]}>
+                        {t('generalReport')}
+                    </Text>
                 </TouchableOpacity>
             </View>
 
             {/* Contenu de l'Onglet */}
             <View style={styles.contentContainer}>
                 {activeTab === 'members' ? (
-                    <MembersReport />
+                    <MembersReport currentLanguage={currentLanguage} />
                 ) : (
-                    <GeneralReport />
+                    <GeneralReport currentLanguage={currentLanguage} />
                 )}
             </View>
         </View>
@@ -51,9 +264,19 @@ export default function App() {
 // ------------------------------------------
 // Composant du Rapport des Membres (Version Tableau)
 // ------------------------------------------
-function MembersReport() {
+function MembersReport({ currentLanguage }) {
     const [members, setMembers] = useState([]);
     const [loading, setLoading] = useState(true);
+
+    // Fonction de traduction
+    const t = (key) => {
+        const keys = key.split('.');
+        let result = translations[currentLanguage];
+        keys.forEach(k => {
+            result = result?.[k];
+        });
+        return result ?? key;
+    };
 
     const fetchMembers = useCallback(async () => {
         setLoading(true);
@@ -61,7 +284,7 @@ function MembersReport() {
             const response = await axios.get(ALL_MEMBERS_REPORT_API);
             setMembers(response.data);
         } catch (error) {
-            Alert.alert("Erreur", "Impossible de récupérer les données des membres.");
+            Alert.alert(t('error'), t('connectionError'));
             console.error(error);
         } finally {
             setLoading(false);
@@ -78,7 +301,7 @@ function MembersReport() {
 
     const generatePDF = async () => {
         if (members.length === 0) {
-            return Alert.alert("Information", "Aucune donnée de membre à imprimer.");
+            return Alert.alert("Information", t('noData'));
         }
         
         const date = new Date().toLocaleDateString();
@@ -97,19 +320,19 @@ function MembersReport() {
                 </style>
             </head>
             <body>
-                <h1>Rapport des Membres</h1>
-                <p>Date du rapport : <strong>${date}</strong></p>
+                <h1>${t('membersReport')}</h1>
+                <p>${t('generatedOn')} : <strong>${date}</strong></p>
                 <table>
                     <thead>
                         <tr>
-                            <th>Nom</th>
-                            <th>Téléphone</th>
-                            <th>Actions</th>
-                            <th>Contribution</th>
-                            <th>Prêt</th>
-                            <th>Remboursement</th>
-                            <th>Intérêt</th>
-                            <th>Total</th>
+                            <th>${t('member')}</th>
+                            <th>${t('phone')}</th>
+                            <th>${t('actions')}</th>
+                            <th>${t('contribution')}</th>
+                            <th>${t('loan')}</th>
+                            <th>${t('refund')}</th>
+                            <th>${t('interest')}</th>
+                            <th>${t('total')}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -139,14 +362,14 @@ function MembersReport() {
             const { uri } = await Print.printToFileAsync({ html: htmlContent });
             await Sharing.shareAsync(uri);
         } catch (error) {
-            Alert.alert("Erreur", "Échec de la génération du PDF des membres.");
+            Alert.alert(t('error'), t('pdfError'));
             console.error("PDF Error:", error);
         }
     };
 
     return (
         <View style={reportStyles.reportContainer}>
-            <Text style={reportStyles.dateText}>Date de la dernière mise à jour : {new Date().toLocaleDateString()}</Text>
+            <Text style={reportStyles.dateText}>{t('lastUpdate')} : {new Date().toLocaleDateString()}</Text>
 
             {loading ? (
                 <ActivityIndicator size="large" color="#007BFF" style={reportStyles.loadingIndicator} />
@@ -154,14 +377,14 @@ function MembersReport() {
                 <>
                     {/* En-tête du tableau */}
                     <View style={reportStyles.tableHeader}>
-                        <Text style={[reportStyles.headerCell, reportStyles.nameHeader]}>Membre</Text>
-                        <Text style={[reportStyles.headerCell, reportStyles.phoneHeader]}>Téléphone</Text>
-                        <Text style={[reportStyles.headerCell, reportStyles.actionsHeader]}>Actions</Text>
-                        <Text style={[reportStyles.headerCell, reportStyles.amountHeader]}>Contribution</Text>
-                        <Text style={[reportStyles.headerCell, reportStyles.amountHeader]}>Prêt</Text>
-                        <Text style={[reportStyles.headerCell, reportStyles.amountHeader]}>Remboursement</Text>
-                        <Text style={[reportStyles.headerCell, reportStyles.amountHeader]}>Intérêt</Text>
-                        <Text style={[reportStyles.headerCell, reportStyles.totalHeader]}>Total</Text>
+                        <Text style={[reportStyles.headerCell, reportStyles.nameHeader]}>{t('member')}</Text>
+                        <Text style={[reportStyles.headerCell, reportStyles.phoneHeader]}>{t('phone')}</Text>
+                        <Text style={[reportStyles.headerCell, reportStyles.actionsHeader]}>{t('actions')}</Text>
+                        <Text style={[reportStyles.headerCell, reportStyles.amountHeader]}>{t('contribution')}</Text>
+                        <Text style={[reportStyles.headerCell, reportStyles.amountHeader]}>{t('loan')}</Text>
+                        <Text style={[reportStyles.headerCell, reportStyles.amountHeader]}>{t('refund')}</Text>
+                        <Text style={[reportStyles.headerCell, reportStyles.amountHeader]}>{t('interest')}</Text>
+                        <Text style={[reportStyles.headerCell, reportStyles.totalHeader]}>{t('total')}</Text>
                     </View>
 
                     {/* Corps du tableau avec ScrollView */}
@@ -219,15 +442,15 @@ function MembersReport() {
                     {/* Résumé en bas du tableau */}
                     <View style={reportStyles.tableFooter}>
                         <Text style={reportStyles.footerText}>
-                            Total des membres: {members.length}
+                            {t('totalMembers')}: {members.length}
                         </Text>
                         <Text style={reportStyles.footerText}>
-                            Total général: {formatAmount(members.reduce((sum, item) => sum + (item.totalAmount || 0), 0))} FBu
+                            {t('totalGeneral')}: {formatAmount(members.reduce((sum, item) => sum + (item.totalAmount || 0), 0))} FBu
                         </Text>
                     </View>
 
                     <View style={reportStyles.buttonContainer}>
-                        <Button title="Générer le PDF" onPress={generatePDF} color="#007BFF" disabled={loading || members.length === 0} />
+                        <Button title={t('generatePDF')} onPress={generatePDF} color="#007BFF" disabled={loading || members.length === 0} />
                     </View>
                 </>
             )}
@@ -236,11 +459,21 @@ function MembersReport() {
 }
 
 // ------------------------------------------
-// Composant du Rapport Général (inchangé)
+// Composant du Rapport Général
 // ------------------------------------------
-function GeneralReport() {
+function GeneralReport({ currentLanguage }) {
     const [report, setReport] = useState(null);
     const [loading, setLoading] = useState(true);
+
+    // Fonction de traduction
+    const t = (key) => {
+        const keys = key.split('.');
+        let result = translations[currentLanguage];
+        keys.forEach(k => {
+            result = result?.[k];
+        });
+        return result ?? key;
+    };
 
     const fetchGeneralReport = useCallback(async () => {
         setLoading(true);
@@ -248,7 +481,7 @@ function GeneralReport() {
             const response = await axios.get(GENERAL_REPORT_API);
             setReport(response.data);
         } catch (error) {
-            Alert.alert("Erreur", "Impossible de récupérer le rapport général.");
+            Alert.alert(t('error'), t('connectionError'));
             console.error(error);
             setReport(null);
         } finally {
@@ -266,7 +499,7 @@ function GeneralReport() {
     
     const generateGeneralPDF = async () => {
         if (!report) {
-            return Alert.alert("Information", "Aucune donnée de rapport général à imprimer.");
+            return Alert.alert("Information", t('noData'));
         }
 
         const date = new Date().toLocaleDateString();
@@ -287,31 +520,31 @@ function GeneralReport() {
                 </style>
             </head>
             <body>
-                <h1>Rapport Général du Système</h1>
-                <p>Date du rapport : <strong>${date}</strong></p>
+                <h1>${t('generalReport')}</h1>
+                <p>${t('generatedOn')} : <strong>${date}</strong></p>
                 <div class="report-box">
                     <div class="report-row">
-                        <span class="label">Nombre total de Membres</span>
+                        <span class="label">${t('generalReportData.totalMembers')}</span>
                         <span class="value highlight">${report.manyofMembers}</span>
                     </div>
                     <div class="report-row">
-                        <span class="label">Total des Actions</span>
+                        <span class="label">${t('generalReportData.totalActions')}</span>
                         <span class="value">${formatAmount(report.actions)}</span>
                     </div>
                     <div class="report-row">
-                        <span class="label">Montant total Contribué</span>
+                        <span class="label">${t('generalReportData.totalContributed')}</span>
                         <span class="value">${formatAmount(report.contributedAmount)} FBu</span>
                     </div>
                     <div class="report-row">
-                        <span class="label">Montant total des Prêts</span>
+                        <span class="label">${t('generalReportData.totalLoans')}</span>
                         <span class="value">${formatAmount(report.creditedAmount)} FBu</span>
                     </div>
                     <div class="report-row">
-                        <span class="label">Montant total des Intérêts</span>
+                        <span class="label">${t('generalReportData.totalInterests')}</span>
                         <span class="value">${formatAmount(report.interestAmount)} FBu</span>
                     </div>
                     <div class="report-row">
-                        <span class="label">Pénalités de Contribution</span>
+                        <span class="label">${t('generalReportData.contributionPenalties')}</span>
                         <span class="value">${formatAmount(report.contributionLatePenalityAmount)} FBu</span>
                     </div>
                 </div>
@@ -323,59 +556,59 @@ function GeneralReport() {
             const { uri } = await Print.printToFileAsync({ html: htmlContent });
             await Sharing.shareAsync(uri);
         } catch (error) {
-            Alert.alert("Erreur", "Échec de la génération du PDF général.");
+            Alert.alert(t('error'), t('pdfError'));
             console.error("PDF Error:", error);
         }
     };
 
     return (
         <View style={reportStyles.reportContainer}>
-            <Text style={reportStyles.dateText}>Généré le : {new Date().toLocaleDateString()}</Text>
+            <Text style={reportStyles.dateText}>{t('generatedOn')} : {new Date().toLocaleDateString()}</Text>
             {loading ? (
                 <ActivityIndicator size="large" color="#007BFF" style={reportStyles.loadingIndicator} />
             ) : report ? (
                 <ScrollView contentContainerStyle={reportStyles.scrollContent}>
                     <View style={reportStyles.generalCard}>
                         <View style={reportStyles.generalRow}>
-                            <Text style={reportStyles.generalLabel}>Nombre de Membres</Text>
+                            <Text style={reportStyles.generalLabel}>{t('generalReportData.totalMembers')}</Text>
                             <Text style={reportStyles.generalValueImportant}>{report.manyofMembers}</Text>
                         </View>
                         
                         <View style={reportStyles.generalDivider} />
 
                         <View style={reportStyles.generalRow}>
-                            <Text style={reportStyles.generalLabel}>Total des Actions</Text>
+                            <Text style={reportStyles.generalLabel}>{t('generalReportData.totalActions')}</Text>
                             <Text style={reportStyles.generalValue}>{formatAmount(report.actions)}</Text>
                         </View>
 
                         <View style={reportStyles.generalRow}>
-                            <Text style={reportStyles.generalLabel}>Total Contribué (FBu)</Text>
+                            <Text style={reportStyles.generalLabel}>{t('generalReportData.totalContributed')}</Text>
                             <Text style={reportStyles.generalValue}>{formatAmount(report.contributedAmount)} FBu</Text>
                         </View>
 
                         <View style={reportStyles.generalRow}>
-                            <Text style={reportStyles.generalLabel}>Total des Prêts (FBu)</Text>
+                            <Text style={reportStyles.generalLabel}>{t('generalReportData.totalLoans')}</Text>
                             <Text style={reportStyles.generalValue}>{formatAmount(report.creditedAmount)} FBu</Text>
                         </View>
 
                         <View style={reportStyles.generalRow}>
-                            <Text style={reportStyles.generalLabel}>Total Intérêts (FBu)</Text>
+                            <Text style={reportStyles.generalLabel}>{t('generalReportData.totalInterests')}</Text>
                             <Text style={reportStyles.generalValue}>{formatAmount(report.interestAmount)} FBu</Text>
                         </View>
 
                         <View style={reportStyles.generalRow}>
-                            <Text style={reportStyles.generalLabel}>Pénalités de Contribution (FBu)</Text>
+                            <Text style={reportStyles.generalLabel}>{t('generalReportData.contributionPenalties')}</Text>
                             <Text style={reportStyles.generalValue}>{formatAmount(report.contributionLatePenalityAmount)} FBu</Text>
                         </View>
                     </View>
                 </ScrollView>
             ) : (
-                <Text style={reportStyles.errorText}>Impossible d'afficher le rapport général.</Text>
+                <Text style={reportStyles.errorText}>{t('messages.connectionError')}</Text>
             )}
 
             <View style={reportStyles.buttonContainer}>
                 <Button 
-                    title="Générer le PDF" 
+                    title={t('generatePDF')} 
                     onPress={generateGeneralPDF} 
                     color="#007BFF" 
                     disabled={loading || !report} 
@@ -392,15 +625,7 @@ function GeneralReport() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        paddingTop: 40,
         backgroundColor: "#f9f9f9",
-    },
-    header: {
-        fontSize: 22,
-        fontWeight: "bold",
-        color: "#007BFF",
-        textAlign: "center",
-        marginBottom: 10,
     },
     tabContainer: {
         flexDirection: 'row',
@@ -544,7 +769,7 @@ const reportStyles = StyleSheet.create({
         paddingHorizontal: 5,
     },
 
-    // Styles pour le Rapport Général (inchangés)
+    // Styles pour le Rapport Général
     generalCard: {
         backgroundColor: "#fff",
         borderRadius: 12,
@@ -588,5 +813,65 @@ const reportStyles = StyleSheet.create({
         color: 'red',
         marginTop: 50,
         fontSize: 16,
+    }
+});
+
+const headerStyles = StyleSheet.create({
+    headerRight: {
+        marginRight: 15,
+        flexDirection: 'row',
+        alignItems: 'center',
+        zIndex: 100
+    }
+});
+
+const embeddedStyles = StyleSheet.create({
+    languageContainer: {
+        position: 'relative',
+        zIndex: 999
+    },
+    languageButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 5,
+        borderRadius: 5,
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: PRIMARY_COLOR
+    },
+    languageButtonText: {
+        fontWeight: '700',
+        color: PRIMARY_COLOR,
+        marginRight: 3
+    },
+    languageDropdown: {
+        position: 'absolute',
+        top: 35,
+        left: 0,
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: PRIMARY_COLOR,
+        borderRadius: 5,
+        width: 120
+    },
+    languageOption: {
+        padding: 8
+    },
+    languageOptionSelected: {
+        backgroundColor: PRIMARY_COLOR
+    },
+    languageOptionText: {
+        color: PRIMARY_COLOR
+    },
+    languageOptionTextSelected: {
+        color: '#fff'
+    },
+    overlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: -1
     }
 });
